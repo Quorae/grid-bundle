@@ -26,7 +26,7 @@
     <div class="grid-container">
         {# Filter bar (search + filtres) — rendue seulement s'il y a au moins
            un filtre ou la search. Le form intercepte submit + turbo-frame. #}
-        {% set hasSearch = view.definition.search is defined and view.definition.search is not null %}
+        {% set hasSearch = view.definition.search is not null %}
         {% set hasFilters = view.definition.filters|length > 0 %}
 
         {% if hasSearch or hasFilters %}
@@ -38,7 +38,7 @@
 
         {% if view.response.rows|length == 0 %}
             {% include '@QuoraeGrid/components/Grid/_empty.html.twig' with { view: view } only %}
-        {% elseif view.definition.renderRow is defined and view.definition.renderRow %}
+        {% elseif view.definition.renderRow %}
             {# Custom layout — pas de `<table>` : le partial est souverain sur
                son DOM. Chaque row est inclus dans un conteneur générique
                `<ul class="grid-cards">` pour préserver la sémantique liste. #}
@@ -55,7 +55,7 @@
                 <table class="grid-table" aria-label="{{ view.definition.name }}">
                     <thead>
                         <tr>
-                            {% if view.definition.expandable is defined and view.definition.expandable %}
+                            {% if view.definition.expandable %}
                                 <th scope="col" class="grid-cell-chevron" aria-label="Expansion"></th>
                             {% endif %}
                             {% for column in view.definition.columns %}
@@ -81,8 +81,8 @@
                             {% endfor %}
                         </tr>
                     </thead>
-                    <tbody{% if view.definition.expandable is defined and view.definition.expandable %} data-controller="expandable-grid"{% endif %}>
-                        {% set isExpandable = view.definition.expandable is defined and view.definition.expandable %}
+                    <tbody{% if view.definition.expandable %} data-controller="expandable-grid"{% endif %}>
+                        {% set isExpandable = view.definition.expandable %}
                         {% for row in view.response.rows %}
                             {% set rowClasses = grid.row_classes(row, view) %}
                             {% set rowLink = view.definition.rowLink %}

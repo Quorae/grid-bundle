@@ -2,3 +2,11 @@ parameters:
     level: 8
     paths:
         - src
+        - tests
+    ignoreErrors:
+        - identifier: argument.type
+          path: tests/*
+          reportUnmatched: false
+        - identifier: property.notFound
+          path: tests/*
+          reportUnmatched: false

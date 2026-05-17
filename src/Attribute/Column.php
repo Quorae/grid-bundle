@@ -12,7 +12,7 @@ use Quorae\GridBundle\Enum\Formatter;
  * slot used to read the column metadata at compile-time).
  *
  * `sortable` carries the SQL column name fed to `ORDER BY` — the repository
- * remains souverain on its SQL, the framework only forwards the hint.
+ * remains sovereign on its SQL, the framework only forwards the hint.
  */
 #[\Attribute(\Attribute::TARGET_PROPERTY)]
 final readonly class Column

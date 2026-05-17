@@ -24,11 +24,7 @@ final class BulkActionException extends \RuntimeException implements GridExcepti
 
     public static function unknownAction(string $gridName, string $actionName): self
     {
-        return new self(BulkActionErrorKind::UnknownAction, \sprintf(
-            'Grid "%s" does not declare a bulk action named "%s".',
-            $gridName,
-            $actionName,
-        ));
+        return new self(BulkActionErrorKind::UnknownAction, 'Action non reconnue.');
     }
 
     public static function handlerNotTagged(string $handlerFqcn): self
@@ -41,11 +37,7 @@ final class BulkActionException extends \RuntimeException implements GridExcepti
 
     public static function accessDenied(string $actionName, string $requiredRole): self
     {
-        return new self(BulkActionErrorKind::AccessDenied, \sprintf(
-            'Bulk action "%s" requires role "%s".',
-            $actionName,
-            $requiredRole,
-        ));
+        return new self(BulkActionErrorKind::AccessDenied, 'Vous n\'avez pas les droits pour cette action.');
     }
 
     public static function emptySelection(): self

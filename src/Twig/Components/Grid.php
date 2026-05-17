@@ -15,10 +15,15 @@ use Symfony\UX\TwigComponent\Attribute\AsTwigComponent;
  * No business logic here — the component is a pass-through to the template,
  * which reads everything it needs from `$view`.
  *
- * Template path : `@QuoraeGrid/components/Grid/grid.html.twig` (WP-3 — frontend task).
+ * Template path : `@QuoraeGrid/components/Grid/grid.html.twig`.
  */
 #[AsTwigComponent(name: 'Grid:Grid', template: '@QuoraeGrid/components/Grid/grid.html.twig')]
 final class Grid
 {
     public GridView $view;
+
+    public function mount(GridView $view): void
+    {
+        $this->view = $view;
+    }
 }

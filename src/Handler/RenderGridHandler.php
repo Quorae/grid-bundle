@@ -27,14 +27,7 @@ use Symfony\Component\HttpFoundation\Request;
  *
  * **Stateless by design** — same instance can serve concurrent requests.
  */
-/**
- * Non-`final`, non-`readonly` on purpose : unit tests extend and stub
- * `handle()` (Test Subclass pattern) for consumers that only need the
- * rendered `GridView` without exercising filter hydration or data-source
- * resolution. Immutability is preserved by making each dependency `readonly`
- * on the property declaration.
- */
-class RenderGridHandler
+final class RenderGridHandler
 {
     public function __construct(
         private readonly GridRegistry $registry,
@@ -56,7 +49,7 @@ class RenderGridHandler
         $definition = $this->registry->get($gridName);
         $dataSource = $this->resolveDataSource($definition);
         $filter = $this->filterHydrator->hydrate($definition, $request, $extraContext);
-        $runtimeDefinition = $this->resolveRuntimeDefinition($definition, $filter, $extraContext);
+        $runtimeDefinition = $this->resolveRuntimeChoices($definition, $filter, $extraContext);
         $page = $this->pageParser->parse($definition, $request);
 
         $response = $dataSource->fetch($filter, $page);
@@ -127,7 +120,7 @@ class RenderGridHandler
     /**
      * @param array<string, mixed> $extraContext
      */
-    private function resolveRuntimeDefinition(GridDefinition $definition, object $filter, array $extraContext): GridDefinition
+    private function resolveRuntimeChoices(GridDefinition $definition, object $filter, array $extraContext): GridDefinition
     {
         $resolvedFilters = [];
         $hasRuntimeChoices = false;

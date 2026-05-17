@@ -133,7 +133,7 @@ final readonly class FilterHydrator
         $query = $request->query;
         $qValue = $query->get('q');
         if (\is_string($qValue)) {
-            $raw['q'] = $qValue;
+            $raw['q'] = mb_substr($qValue, 0, 255);
         }
 
         $criteria = $query->all('criteria');
@@ -204,9 +204,9 @@ final readonly class FilterHydrator
 
     private function camelToSnake(string $value): string
     {
-        $snake = preg_replace('/[A-Z]/', '_$0', $value);
+        $snake = (string) preg_replace('/[A-Z]/', '_$0', $value);
 
-        return strtolower($snake ?? $value);
+        return strtolower($snake);
     }
 
     private function defaultFor(\ReflectionParameter $parameter): mixed

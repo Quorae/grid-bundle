@@ -62,7 +62,7 @@ final class BulkActionExecutorTest extends TestCase
         $executor = $this->buildExecutor(gridName: 'memos', bulkActions: []);
 
         $this->expectException(BulkActionException::class);
-        $this->expectExceptionMessage('"memos"');
+        $this->expectExceptionMessage('Action non reconnue.');
 
         $executor->execute('memos', 'ghost', [1], [], $this->buildUser());
     }
@@ -78,7 +78,7 @@ final class BulkActionExecutorTest extends TestCase
         );
 
         $this->expectException(BulkActionException::class);
-        $this->expectExceptionMessage('ROLE_ADMIN');
+        $this->expectExceptionMessage('Vous n\'avez pas les droits pour cette action.');
 
         $executor->execute('memos', 'delete', [1], [], $this->buildUser());
     }

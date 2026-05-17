@@ -41,7 +41,7 @@
     {% set filterType = filter.type.value ?? filter.type %}
     {% set current = attribute(view.filter, filter.propertyName) %}
     {% set hasValue = current is same as(false) or (current is not null and current != '') %}
-    {% if filterType == 'pills' or filterType == 'select' or filterType == 'toggle' %}
+    {% if filterType == 'pills' or filterType == 'toggle' %}
         {% set prefixMap = prefixMap|merge({
             (filter.propertyName): {
                 label: filter.label,
@@ -72,21 +72,29 @@
     {% set activeFilterCount = activeFilterCount + 1 %}
 {% endif %}
 
-{# Compte les tokens actifs (pills/select/toggle + DateRange, pas search) pour le mode +N #}
+{# Compte les tokens actifs (pills/toggle + DateRange, pas search ni select)
+   pour le mode +N. Select filters ne comptent pas : ils sont rendus en <select>
+   visible, pas en token. #}
 {% set activeTokenCount = 0 %}
 {% for filter in filters %}
     {% set filterType = filter.type.value ?? filter.type %}
     {% set current = attribute(view.filter, filter.propertyName) %}
     {% set hasValue = current is same as(false) or (current is not null and current != '') %}
-    {% if (filterType == 'pills' or filterType == 'select') and hasValue %}
+    {% if filterType == 'pills' and hasValue %}
         {% set activeTokenCount = activeTokenCount + 1 %}
     {% elseif filterType == 'toggle' and current %}
         {% set activeTokenCount = activeTokenCount + 1 %}
     {% endif %}
 {% endfor %}
 
-{# DateRange : collecter les données pour le token résumé dans la barre #}
+{# DateRange : collecter les données pour le token résumé dans la barre.
+   Le token ne s'affiche que si l'URL contient explicitement les paramètres
+   criteria[…_from] / criteria[…_to]. Si le DTO fournit des valeurs par défaut
+   (ex. mois courant sur la timeline), le token n'apparaît pas — les inputs
+   date restent visibles avec les valeurs par défaut, mais le token n'est pas
+   rendu (pas de bouton × trompeur qui ne fait que réinitialiser aux défauts). #}
 {% set dateRangeTokenData = null %}
+{% set criteriaFromUrl = app.request.query.all.criteria ?? {} %}
 {% for filter in filters %}
     {% set filterType = filter.type.value ?? filter.type %}
     {% if filterType == 'date_range' %}
@@ -94,7 +102,9 @@
         {% set toValue = attribute(view.filter, filter.propertyName ~ 'To') ?? attribute(view.filter, filter.propertyName ~ '_to') ?? '' %}
         {% set hasFrom = fromValue is not null and fromValue != '' %}
         {% set hasTo = toValue is not null and toValue != '' %}
-        {% if hasFrom or hasTo %}
+        {% set urlHasFrom = (criteriaFromUrl[filter.propertyName ~ '_from'] ?? '') != '' %}
+        {% set urlHasTo = (criteriaFromUrl[filter.propertyName ~ '_to'] ?? '') != '' %}
+        {% if (hasFrom or hasTo) and (urlHasFrom or urlHasTo) %}
             {% set activeTokenCount = activeTokenCount + 1 %}
             {% set dateRangeTokenData = {
                 label: filter.label,
@@ -191,36 +201,54 @@
             } only %}
         </div>
 
-        {# ── DateRange — hors tokenisation, sous la barre ── #}
-        {% for filter in filters %}
-            {% set filterType = filter.type.value ?? filter.type %}
-            {% if filterType == 'date_range' %}
-                {% set fromProp = filter.propertyName ~ 'From' %}
-                {% set toProp = filter.propertyName ~ 'To' %}
-                {% set fromValue = attribute(view.filter, fromProp) ?? attribute(view.filter, filter.propertyName ~ '_from') ?? '' %}
-                {% set toValue = attribute(view.filter, toProp) ?? attribute(view.filter, filter.propertyName ~ '_to') ?? '' %}
-                <div class="fb-daterange">
-                    <span class="fb-daterange-label">{{ filter.label }}</span>
-                    <label class="sr-only"
-                           for="fb-live-dr-{{ view.definition.name }}-{{ filter.propertyName }}-from">
-                        {{ filter.label }} — début
-                    </label>
-                    <input type="date"
-                           id="fb-live-dr-{{ view.definition.name }}-{{ filter.propertyName }}-from"
-                           data-model="{{ fromProp }}"
-                           value="{{ fromValue is not null and fromValue != '' ? fromValue|safe_date_fr('Y-m-d') : '' }}">
-                    <span class="fb-daterange-sep" aria-hidden="true">→</span>
-                    <label class="sr-only"
-                           for="fb-live-dr-{{ view.definition.name }}-{{ filter.propertyName }}-to">
-                        {{ filter.label }} — fin
-                    </label>
-                    <input type="date"
-                           id="fb-live-dr-{{ view.definition.name }}-{{ filter.propertyName }}-to"
-                           data-model="{{ toProp }}"
-                           value="{{ toValue is not null and toValue != '' ? toValue|safe_date_fr('Y-m-d') : '' }}">
-                </div>
-            {% endif %}
-        {% endfor %}
+        {# ── Filtres visibles : Select dropdowns + DateRange ── #}
+        <div class="fb-filters">
+            {% for filter in filters %}
+                {% set filterType = filter.type.value ?? filter.type %}
+                {% if filterType == 'select' %}
+                    {% set current = attribute(view.filter, filter.propertyName) %}
+                    <div class="fb-select">
+                        <span class="fb-select-label">{{ filter.label }}</span>
+                        <select data-model="criteria[{{ filter.propertyName }}]">
+                            <option value="">Tous</option>
+                            {% for choiceValue, choiceLabel in filter.choices %}
+                                <option value="{{ choiceValue }}"{% if current is not null and current ~ '' == choiceValue ~ '' %} selected{% endif %}>{{ choiceLabel }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                {% endif %}
+            {% endfor %}
+
+            {% for filter in filters %}
+                {% set filterType = filter.type.value ?? filter.type %}
+                {% if filterType == 'date_range' %}
+                    {% set fromProp = filter.propertyName ~ 'From' %}
+                    {% set toProp = filter.propertyName ~ 'To' %}
+                    {% set fromValue = attribute(view.filter, fromProp) ?? attribute(view.filter, filter.propertyName ~ '_from') ?? '' %}
+                    {% set toValue = attribute(view.filter, toProp) ?? attribute(view.filter, filter.propertyName ~ '_to') ?? '' %}
+                    <div class="fb-daterange">
+                        <span class="fb-daterange-label">{{ filter.label }}</span>
+                        <label class="sr-only"
+                               for="fb-live-dr-{{ view.definition.name }}-{{ filter.propertyName }}-from">
+                            {{ filter.label }} — début
+                        </label>
+                        <input type="date"
+                               id="fb-live-dr-{{ view.definition.name }}-{{ filter.propertyName }}-from"
+                               data-model="{{ fromProp }}"
+                               value="{{ fromValue is not null and fromValue != '' ? fromValue|safe_date_fr('Y-m-d') : '' }}">
+                        <span class="fb-daterange-sep" aria-hidden="true">→</span>
+                        <label class="sr-only"
+                               for="fb-live-dr-{{ view.definition.name }}-{{ filter.propertyName }}-to">
+                            {{ filter.label }} — fin
+                        </label>
+                        <input type="date"
+                               id="fb-live-dr-{{ view.definition.name }}-{{ filter.propertyName }}-to"
+                               data-model="{{ toProp }}"
+                               value="{{ toValue is not null and toValue != '' ? toValue|safe_date_fr('Y-m-d') : '' }}">
+                    </div>
+                {% endif %}
+            {% endfor %}
+        </div>
 
         {# ── Screen reader announcer for filter bar state transitions ── #}
         <span class="sr-only"
@@ -323,36 +351,55 @@
             } only %}
         </div>
 
-        {# ── DateRange — hors tokenisation, sous la barre ── #}
-        {% for filter in filters %}
-            {% set filterType = filter.type.value ?? filter.type %}
-            {% if filterType == 'date_range' %}
-                {% set fromValue = attribute(view.filter, filter.propertyName ~ 'From') ?? attribute(view.filter, filter.propertyName ~ '_from') ?? '' %}
-                {% set toValue = attribute(view.filter, filter.propertyName ~ 'To') ?? attribute(view.filter, filter.propertyName ~ '_to') ?? '' %}
-                <div class="fb-daterange">
-                    <span class="fb-daterange-label">{{ filter.label }}</span>
-                    <label class="sr-only"
-                           for="fb-dr-{{ view.definition.name }}-{{ filter.propertyName }}-from">
-                        {{ filter.label }} — début
-                    </label>
-                    <input type="date"
-                           id="fb-dr-{{ view.definition.name }}-{{ filter.propertyName }}-from"
-                           name="criteria[{{ filter.propertyName }}_from]"
-                           value="{{ fromValue is not null and fromValue != '' ? fromValue|safe_date_fr('Y-m-d') : '' }}"
-                           data-action="change->grid-search#submit">
-                    <span class="fb-daterange-sep" aria-hidden="true">→</span>
-                    <label class="sr-only"
-                           for="fb-dr-{{ view.definition.name }}-{{ filter.propertyName }}-to">
-                        {{ filter.label }} — fin
-                    </label>
-                    <input type="date"
-                           id="fb-dr-{{ view.definition.name }}-{{ filter.propertyName }}-to"
-                           name="criteria[{{ filter.propertyName }}_to]"
-                           value="{{ toValue is not null and toValue != '' ? toValue|safe_date_fr('Y-m-d') : '' }}"
-                           data-action="change->grid-search#submit">
-                </div>
-            {% endif %}
-        {% endfor %}
+        {# ── Filtres visibles : Select dropdowns + DateRange ── #}
+        <div class="fb-filters">
+            {% for filter in filters %}
+                {% set filterType = filter.type.value ?? filter.type %}
+                {% if filterType == 'select' %}
+                    {% set current = attribute(view.filter, filter.propertyName) %}
+                    <div class="fb-select">
+                        <span class="fb-select-label">{{ filter.label }}</span>
+                        <select name="criteria[{{ filter.propertyName }}]"
+                                data-action="change->grid-search#submit">
+                            <option value="">Tous</option>
+                            {% for choiceValue, choiceLabel in filter.choices %}
+                                <option value="{{ choiceValue }}"{% if current is not null and current ~ '' == choiceValue ~ '' %} selected{% endif %}>{{ choiceLabel }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                {% endif %}
+            {% endfor %}
+
+            {% for filter in filters %}
+                {% set filterType = filter.type.value ?? filter.type %}
+                {% if filterType == 'date_range' %}
+                    {% set fromValue = attribute(view.filter, filter.propertyName ~ 'From') ?? attribute(view.filter, filter.propertyName ~ '_from') ?? '' %}
+                    {% set toValue = attribute(view.filter, filter.propertyName ~ 'To') ?? attribute(view.filter, filter.propertyName ~ '_to') ?? '' %}
+                    <div class="fb-daterange">
+                        <span class="fb-daterange-label">{{ filter.label }}</span>
+                        <label class="sr-only"
+                               for="fb-dr-{{ view.definition.name }}-{{ filter.propertyName }}-from">
+                            {{ filter.label }} — début
+                        </label>
+                        <input type="date"
+                               id="fb-dr-{{ view.definition.name }}-{{ filter.propertyName }}-from"
+                               name="criteria[{{ filter.propertyName }}_from]"
+                               value="{{ fromValue is not null and fromValue != '' ? fromValue|safe_date_fr('Y-m-d') : '' }}"
+                               data-action="change->grid-search#submit">
+                        <span class="fb-daterange-sep" aria-hidden="true">→</span>
+                        <label class="sr-only"
+                               for="fb-dr-{{ view.definition.name }}-{{ filter.propertyName }}-to">
+                            {{ filter.label }} — fin
+                        </label>
+                        <input type="date"
+                               id="fb-dr-{{ view.definition.name }}-{{ filter.propertyName }}-to"
+                               name="criteria[{{ filter.propertyName }}_to]"
+                               value="{{ toValue is not null and toValue != '' ? toValue|safe_date_fr('Y-m-d') : '' }}"
+                               data-action="change->grid-search#submit">
+                    </div>
+                {% endif %}
+            {% endfor %}
+        </div>
 
         {# ── Screen reader announcer for filter bar state transitions ── #}
         <span class="sr-only"

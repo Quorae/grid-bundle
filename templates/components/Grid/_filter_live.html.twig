@@ -53,7 +53,9 @@
         {% set normalizedCurrent = current is same as(false) ? '0' : current %}
         {% set hasValue = current is same as(false) or (current is not null and current != '') %}
 
-        {% if filterType == 'pills' or filterType == 'select' %}
+        {# Select filters: rendered as visible <select> in _filter_bar, no token needed #}
+
+        {% if filterType == 'pills' %}
             {% if hasValue %}
                 {% set choiceLabel = filter.choices[normalizedCurrent] ?? normalizedCurrent %}
                 {% set isOverflow = maxVisible is not null and tokenIndex >= maxVisible %}

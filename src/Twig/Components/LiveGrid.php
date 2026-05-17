@@ -239,9 +239,12 @@ final class LiveGrid
     {
         return match ($exception->kind) {
             BulkActionErrorKind::EmptySelection => 'warning',
-            BulkActionErrorKind::SelectionTooLarge => 'error',
-            BulkActionErrorKind::OwnershipRejected => 'error',
-            default => throw $exception,
+            BulkActionErrorKind::SelectionTooLarge,
+            BulkActionErrorKind::OwnershipRejected,
+            BulkActionErrorKind::AccessDenied,
+            BulkActionErrorKind::UnknownAction => 'error',
+            BulkActionErrorKind::HandlerNotTagged,
+            BulkActionErrorKind::ValidatorNotTagged => throw $exception,
         };
     }
 

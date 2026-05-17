@@ -83,6 +83,10 @@ final class GridFormattingExtension extends AbstractExtension
             return self::EM_DASH;
         }
 
+        if (!\is_numeric($value)) {
+            return self::EM_DASH;
+        }
+
         $amount = (float) $value;
 
         if ($amount === 0.0) {

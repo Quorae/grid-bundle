@@ -22,10 +22,10 @@
 
 <div {{ attributes.defaults({ class: 'grid-container' }) }}
      data-live-label="grid-{{ view.definition.name }}">
-    {% set hasSearch = view.definition.search is defined and view.definition.search is not null %}
+    {% set hasSearch = view.definition.search is not null %}
     {% set hasFilters = view.definition.filters|length > 0 %}
     {# Bulk actions — activées dès que la GridDefinition déclare ≥ 1 action.
-       `selectedIds` est une LiveProp writable exposée par LiveGrid (v.LivePropp
+       `selectedIds` est une LiveProp writable exposée par LiveGrid (v.LiveProp
        au template). `rowIdProperty` indique où lire l'ID sur chaque row. #}
     {% set bulkActions = view.definition.bulkActions|default([]) %}
     {% set hasBulkActions = bulkActions|length > 0 %}
@@ -63,7 +63,7 @@
 
     {% if view.response.rows|length == 0 %}
         {% include '@QuoraeGrid/components/Grid/_empty.html.twig' with { view: view } only %}
-    {% elseif view.definition.renderRow is defined and view.definition.renderRow %}
+    {% elseif view.definition.renderRow %}
         {# Custom layout — le partial est souverain sur son DOM (cf. mémos en
            cartes). Miroir du pattern `grid.html.twig` pour garantir un HTML
            sémantique identique entre modes Turbo et Live. #}
@@ -86,7 +86,7 @@
             } only %}
         {% endif %}
     {% else %}
-        {% set isExpandable = view.definition.expandable is defined and view.definition.expandable %}
+        {% set isExpandable = view.definition.expandable %}
         <div class="grid-scroll"{% if isExpandable %} data-controller="expandable-grid"{% endif %}>
             <table class="grid-table"
                    aria-label="{{ view.definition.name }}">
@@ -127,7 +127,8 @@
                 </thead>
                 <tbody>
                     {% set _groupBy = view.definition.groupBy|default(null) %}
-                    {% set _isGrouped = _groupBy is not null and attribute(view.filter, _groupBy) is null %}
+                    {% set _groupValue = _groupBy is not null ? attribute(view.filter, _groupBy) : null %}
+                    {% set _isGrouped = _groupBy is not null and (_groupValue is null or _groupValue == '') %}
                     {% set _groupLabelProp = view.definition.groupLabelProperty|default(_groupBy) %}
                     {% set _colSpan = view.definition.columns|length + (isExpandable ? 1 : 0) + (hasBulkActions ? 1 : 0) %}
                     {% for row in view.response.rows %}
@@ -213,7 +214,7 @@
                                 {{ isExpanded ? '' : 'hidden' }}
                                 data-expandable-grid-target="panel"
                                 data-row-id="{{ expandRowId }}">
-                                <td colspan="{{ view.definition.columns|length + 1 + (hasBulkActions ? 1 : 0) }}">
+                                <td colspan="{{ _colSpan }}">
                                     <turbo-frame
                                         id="grid-expand-{{ view.definition.name }}-{{ expandRowId }}"
                                         src="{{ path(view.definition.expandRoute, { (view.definition.expandRouteParam): expandRowId }) }}"
