@@ -12,6 +12,10 @@
             "expandable_grid": {
                 "enabled": true,
                 "fetch": "lazy"
+            },
+            "row_link": {
+                "enabled": true,
+                "fetch": "lazy"
             }
         }
     },

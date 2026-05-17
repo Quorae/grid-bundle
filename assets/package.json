@@ -23,6 +23,12 @@
                 "name": "expandable-grid",
                 "fetch": "lazy",
                 "enabled": true
+            },
+            "row_link": {
+                "main": "controllers/row_link_controller.js",
+                "name": "row-link",
+                "fetch": "lazy",
+                "enabled": true
             }
         },
         "importmap": {

@@ -102,6 +102,7 @@
                                 <tr{% if rowClasses %} class="{{ rowClasses }}"{% endif %}
                                     data-href="{{ rowHref }}"
                                     data-controller="row-link"
+                                    data-action="click->row-link#click keydown->row-link#keydown"
                                     tabindex="0"
                                     {% if rowAriaLabel %}aria-label="{{ rowAriaLabel }}"{% endif %}>
                             {% else %}

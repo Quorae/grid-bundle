@@ -156,7 +156,23 @@
                                 data-expandable-grid-id-param="{{ expandRowId }}"
                                 style="cursor: pointer">
                         {% else %}
-                            <tr{% if rowClasses %} class="{{ rowClasses }}"{% endif %}>
+                            {% set rowLink = view.definition.rowLink %}
+                            {% if rowLink %}
+                                {% set rowHref = url(rowLink.route, { (rowLink.param): attribute(row, rowLink.rowProperty) }) %}
+                                {% if rowLink.ariaLabel and rowLink.ariaLabelField %}
+                                    {% set rowAriaLabel = rowLink.ariaLabel|format(attribute(row, rowLink.ariaLabelField)) %}
+                                {% else %}
+                                    {% set rowAriaLabel = null %}
+                                {% endif %}
+                                <tr{% if rowClasses %} class="{{ rowClasses }}"{% endif %}
+                                    data-href="{{ rowHref }}"
+                                    data-controller="row-link"
+                                    data-action="click->row-link#click keydown->row-link#keydown"
+                                    tabindex="0"
+                                    {% if rowAriaLabel %}aria-label="{{ rowAriaLabel }}"{% endif %}>
+                            {% else %}
+                                <tr{% if rowClasses %} class="{{ rowClasses }}"{% endif %}>
+                            {% endif %}
                         {% endif %}
                             {% if isExpandable %}
                                 <td class="grid-cell-chevron">
