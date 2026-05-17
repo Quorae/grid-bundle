@@ -385,7 +385,7 @@
                                id="fb-dr-{{ view.definition.name }}-{{ filter.propertyName }}-from"
                                name="criteria[{{ filter.propertyName }}_from]"
                                value="{{ fromValue is not null and fromValue != '' ? fromValue|safe_date_fr('Y-m-d') : '' }}"
-                               data-action="change->grid-search#submit">
+                               data-action="change->grid-search#dateSubmit">
                         <span class="fb-daterange-sep" aria-hidden="true">→</span>
                         <label class="sr-only"
                                for="fb-dr-{{ view.definition.name }}-{{ filter.propertyName }}-to">
@@ -395,7 +395,7 @@
                                id="fb-dr-{{ view.definition.name }}-{{ filter.propertyName }}-to"
                                name="criteria[{{ filter.propertyName }}_to]"
                                value="{{ toValue is not null and toValue != '' ? toValue|safe_date_fr('Y-m-d') : '' }}"
-                               data-action="change->grid-search#submit">
+                               data-action="change->grid-search#dateSubmit">
                     </div>
                 {% endif %}
             {% endfor %}

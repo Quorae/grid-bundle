@@ -9,13 +9,16 @@ import { Controller } from '@hotwired/stimulus';
  * `debounceValue` ms d'inactivité — le Turbo Frame parent (`data-turbo-frame="grid-<name>"`)
  * réactualise alors le contenu sans full reload.
  *
- * Deux modes de déclenchement :
+ * Trois modes de déclenchement :
  *   - `input` (recherche textuelle) : debounced, on respecte le temps de frappe.
- *   - `change` (pills / select / toggle / daterange) : submit immédiat —
+ *   - `change` (pills / select / toggle) : submit immédiat —
  *     l'utilisateur a fait un choix final.
+ *   - `dateSubmit` (daterange inputs) : debounced (800ms) — les inputs
+ *     type=date natifs fire `change` sur chaque segment (jour/mois/année),
+ *     un submit immédiat interrompt la saisie et tronque l'année.
  *
  * Préservation du focus : quand Turbo remplace le frame après submit, les
- * inputs sont re-créés. On mémorise `sessionStorage` + curseur de l'input
+ * inputs sont re-créés. On mémorise `sessionStorage` + id de l'input
  * focalisé avant submit et on restaure au `inputTargetConnected` du nouveau
  * DOM — sinon l'utilisateur perd la frappe en cours.
  *
@@ -39,6 +42,15 @@ export default class extends Controller {
     submit() {
         this.#cancel();
         this.#requestSubmit();
+    }
+
+    dateSubmit(event) {
+        this.#cancel();
+        const input = event.currentTarget;
+        if (input && input.id) {
+            this.#rememberFocus(input);
+        }
+        this.#timer = window.setTimeout(() => this.#requestSubmit(), 800);
     }
 
     inputTargetConnected(input) {
