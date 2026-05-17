@@ -1,0 +1,16 @@
+{#
+ # Grid cell · Formatter::Twig — délègue à un template Twig custom.
+ #
+ # Le chemin est fourni via `column.template` (ex. `'grid/cells/_compte_link.html.twig'`).
+ # Le template reçoit `value`, `row`, `column`.
+ #
+ # Cas d'usage canonique : lien cliquable dans une colonne code compte.
+ #
+ # Params : value, row, column
+ #}
+{%- if column.template is null or column.template == '' -%}
+    {#- Fallback défensif : si Formatter::Twig mais pas de template, on rend en Plain. -#}
+    {%- if value is null or value == '' -%}—{%- else -%}{{ value }}{%- endif -%}
+{%- else -%}
+    {%- include column.template with { value: value, row: row, column: column } only -%}
+{%- endif -%}

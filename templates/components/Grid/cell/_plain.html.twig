@@ -1,0 +1,11 @@
+{#
+ # Grid cell · Formatter::Plain — échappement HTML standard, pas de mise en forme.
+ # Pour une valeur null, on affiche un tiret cadratin (convention AICD).
+ #
+ # Params : value, row, column
+ #}
+{%- if value is null or value == '' -%}
+    —
+{%- else -%}
+    {{ value }}
+{%- endif -%}

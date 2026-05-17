@@ -1,0 +1,11 @@
+{#
+ # Grid cell · Formatter::Badge — badge compact (métadonnée discrète,
+ # équivalent sobre de Chip, sans variantes colorées).
+ #
+ # Params : value, row, column
+ #}
+{%- if value is null or value == '' -%}
+    —
+{%- else -%}
+    <span class="badge">{{ value }}</span>
+{%- endif -%}

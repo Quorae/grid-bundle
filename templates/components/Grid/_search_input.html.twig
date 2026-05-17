@@ -1,0 +1,99 @@
+{#
+ # Grid framework — input de recherche (mode Turbo Frame ou Live).
+ #
+ # Deux modes d'intégration :
+ #
+ # Mode classique (fbMode = false, défaut) :
+ #   Wrappé dans un <label class="grid-search"> autonome.
+ #   Utilisé si la barre de filtrage n'est pas en mode .fb-bar.
+ #
+ # Mode filter-bar (fbMode = true) :
+ #   Rendu sans wrapper, directement en tant qu'enfant du .fb-bar.
+ #   L'input reçoit la classe .fb-input au lieu de .grid-search-input,
+ #   plus les targets Stimulus pour grid-filter-bar (popover) et
+ #   grid-search (debounced submit).
+ #
+ # En Turbo : input text `name="q"`, binding via target Stimulus
+ #   `grid-search#input` (auto-submit debouncé).
+ # En Live (fbMode) : `data-model="on(change)|q"` — le controller JS gère le debounce
+ #   et dispatch `change` explicitement ; évite que le morph wipe le popover.
+ # En Live (classique) : `data-model="debounce(300)|q"` — le framework gère le debounce.
+ #
+ # Params :
+ #   view       : GridView
+ #   live       : bool
+ #   fbMode     : bool   (défaut false) — intégration dans .fb-bar
+ #   popoverId  : string (requis si fbMode = true) — id du popover (aria-controls)
+ #   placeholder: string (optionnel) — override du placeholder
+ #}
+
+{% set search = view.definition.search %}
+{% set placeholder = placeholder ?? (search.placeholder ?? 'Rechercher…') %}
+{% set qValue = view.filter.q ?? '' %}
+{% set debounceMs = search.debounceMs ?? 300 %}
+{% set fbMode = fbMode ?? false %}
+{% set popoverId = popoverId ?? '' %}
+
+{% if fbMode %}
+    {# ── Mode intégré dans .fb-bar ── #}
+    <div class="fb-input-compound">
+        <span class="fb-input-prefix" aria-hidden="true"
+              {{ stimulus_target('grid-filter-bar', 'prefix') }}></span>
+        {% if live %}
+            <input type="search"
+                   id="grid-search-{{ view.definition.name }}"
+                   name="q"
+                   class="fb-input"
+                   placeholder="{{ placeholder }}"
+                   value="{{ qValue }}"
+                   autocomplete="off"
+                   role="combobox"
+                   aria-expanded="false"
+                   aria-controls="{{ popoverId }}"
+                   aria-autocomplete="list"
+                   data-model="on(change)|q"
+                   data-action="input->grid-filter-bar#onInput focus->grid-filter-bar#onFocus blur->grid-filter-bar#onBlur keydown->grid-filter-bar#onKeydown"
+                   {{ stimulus_target('grid-filter-bar', 'input') }}>
+        {% else %}
+            <input type="search"
+                   id="grid-search-{{ view.definition.name }}"
+                   name="q"
+                   class="fb-input"
+                   placeholder="{{ placeholder }}"
+                   value="{{ qValue }}"
+                   autocomplete="off"
+                   role="combobox"
+                   aria-expanded="false"
+                   aria-controls="{{ popoverId }}"
+                   aria-autocomplete="list"
+                   data-action="input->grid-filter-bar#onInput focus->grid-filter-bar#onFocus blur->grid-filter-bar#onBlur keydown->grid-filter-bar#onKeydown"
+                   {{ stimulus_target('grid-search', 'input') }}
+                   {{ stimulus_target('grid-filter-bar', 'input') }}>
+        {% endif %}
+    </div>
+{% else %}
+    {# ── Mode classique (barre de filtres horizontale legacy) ── #}
+    <label class="grid-search" for="grid-search-{{ view.definition.name }}">
+        <span class="sr-only">
+            {{ placeholder }}
+        </span>
+        {% if live %}
+            <input type="search"
+                   id="grid-search-{{ view.definition.name }}"
+                   class="grid-search-input"
+                   placeholder="{{ placeholder }}"
+                   value="{{ qValue }}"
+                   data-model="debounce({{ debounceMs }})|q"
+                   autocomplete="off">
+        {% else %}
+            <input type="search"
+                   id="grid-search-{{ view.definition.name }}"
+                   name="q"
+                   class="grid-search-input"
+                   placeholder="{{ placeholder }}"
+                   value="{{ qValue }}"
+                   autocomplete="off"
+                   {{ stimulus_target('grid-search', 'input') }}>
+        {% endif %}
+    </label>
+{% endif %}

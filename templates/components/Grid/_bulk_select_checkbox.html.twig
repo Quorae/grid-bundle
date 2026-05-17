@@ -1,0 +1,32 @@
+{#
+ # Grid framework — checkbox de sélection d'une ligne pour les bulk actions.
+ #
+ # Consomme la LiveProp `selectedIds` (writable, list<int|string>) du
+ # Live Component `Quorae\GridBundle\Twig\Components\LiveGrid`. Le binding est géré
+ # nativement par Symfony UX Live : `data-model="selectedIds[]"` fait que
+ # chaque toggle met à jour le tableau côté composant et re-render le shell.
+ #
+ # À inclure :
+ #   - par `live_grid.html.twig` dans chaque <tr> (première cellule) en mode
+ #     tabulaire (auto-injecté par le shell quand `bulkActions|length > 0`)
+ #   - par un partial `renderRow` consommateur (grid en cartes), dans le coin
+ #     supérieur droit de la carte — le partial consommateur doit ajouter
+ #     `position: relative` sur la racine.
+ #
+ # Params :
+ #   rowId   : scalar            — valeur poussée dans `selectedIds`
+ #   variant : string|null       — 'cell' (default, mode tabulaire inline) ou
+ #                                 'card' (flotte en top-right, z-index au-dessus
+ #                                 d'un stretched-link)
+ #   label   : string|null       — label accessible (défaut : "Sélectionner cette ligne")
+ #}
+{% set variant = variant|default('cell') %}
+{% set label   = label|default('Sélectionner cette ligne') %}
+
+<label class="grid-select-checkbox-wrapper{% if variant == 'card' %} grid-select-checkbox-card{% endif %}"
+       aria-label="{{ label|e('html_attr') }}">
+    <input type="checkbox"
+           class="grid-select-checkbox"
+           value="{{ rowId }}"
+           data-model="selectedIds[]">
+</label>

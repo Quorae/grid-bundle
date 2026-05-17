@@ -1,0 +1,79 @@
+{#
+ # Grid framework — barre d'actions bulk.
+ #
+ # Rendue UNIQUEMENT quand `selectedIds|length > 0`. Les boutons déclenchent
+ # des LiveActions côté `Quorae\GridBundle\Twig\Components\LiveGrid` :
+ #   - `clearSelection` : reset `selectedIds = []`
+ #   - `executeBulk(actionName: string)` : exécute l'action nommée côté handler
+ #   - `selectAllOnPage(ids: array)` : sélectionne tous les IDs de la page
+ #     courante (utilisé seulement en mode cartes, où il n'y a pas de header
+ #     checkbox tabulaire « tout cocher »)
+ #
+ # La confirmation destructive passe par `data-confirm-message` — attribut
+ # natif Symfony UX Live qui déclenche un `window.confirm()` avant l'appel.
+ # Le template {count} est substitué côté serveur (ici en Twig) pour que le
+ # message reflète exactement la cardinalité de la sélection au moment du
+ # rendu.
+ #
+ # Params :
+ #   view           : GridView — expose `view.definition.bulkActions` (list<BulkActionDefinition>)
+ #   selectedIds    : list<int|string> — LiveProp writable (exposée par LiveGrid)
+ #   visibleRowIds  : list<int|string>|null — IDs des rows rendues sur la page
+ #                    courante ; si fournis, active le bouton « Tout cocher cette page »
+ #                    en mode cartes (sinon caché).
+ #}
+{% set selectedCount = selectedIds|default([])|length %}
+{% if selectedCount == 0 %}
+    {# Rendu vide : la barre s'affiche uniquement quand une sélection existe.
+       On garde un conteneur vide pour que le morph Live (idiomorph) ne
+       détruise/recrée pas son ancre DOM à chaque toggle de sélection. #}
+    <div class="grid-bulk-bar-slot" hidden></div>
+{% else %}
+<div class="grid-bulk-bar" role="toolbar" aria-label="Actions de sélection multiple">
+    <span class="grid-bulk-bar__count">
+        <span class="grid-bulk-bar__count-number">{{ selectedCount }}</span>
+        <span class="grid-bulk-bar__count-word">
+            {{- selectedCount > 1 ? ' sélectionnés' : ' sélectionné' -}}
+        </span>
+    </span>
+
+    <button type="button"
+            class="btn ghost sm"
+            data-action="live#action:prevent"
+            data-live-action-param="clearSelection">
+        Tout désélectionner
+    </button>
+
+    {% if visibleRowIds is defined and visibleRowIds is not null and visibleRowIds|length > 0 %}
+        <button type="button"
+                class="btn ghost sm grid-bulk-bar__select-all-page"
+                data-action="live#action:prevent"
+                data-live-action-param="selectAllOnPage"
+                data-live-ids-param="{{ visibleRowIds|json_encode|e('html_attr') }}">
+            Tout cocher cette page
+        </button>
+    {% endif %}
+
+    <span class="grid-bulk-bar__spacer" aria-hidden="true"></span>
+
+    <div class="grid-bulk-bar__actions">
+        {% for action in view.definition.bulkActions %}
+            {% set confirmMsg = action.confirmMessage|default(null) %}
+            {% if confirmMsg is not null %}
+                {% set confirmMsg = confirmMsg|replace({'{count}': selectedCount}) %}
+            {% endif %}
+            <button type="button"
+                    class="btn {{ action.destructive ? 'danger' : 'primary' }} sm"
+                    data-action="live#action:prevent"
+                    data-live-action-param="executeBulk"
+                    data-live-action-name-param="{{ action.name }}"
+                    {% if confirmMsg %}data-confirm-message="{{ confirmMsg|e('html_attr') }}"{% endif %}>
+                {% if action.icon %}
+                    <twig:ux:icon name="{{ action.icon }}" class="grid-bulk-bar__icon w-4 h-4" aria-hidden="true" />
+                {% endif %}
+                <span>{{ action.label }}</span>
+            </button>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}

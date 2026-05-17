@@ -1,0 +1,363 @@
+{#
+ # Grid framework — filter bar tokenisée "command line" (Proposition A).
+ #
+ # Mode Turbo Frame (`live = false`) :
+ #   Wrappée dans un <form method="get"> piloté par Stimulus `grid-search`.
+ #   Le controller `grid-filter-bar` gère le popover. Sur sélection d'une
+ #   suggestion, il dispatch `grid-filter-bar:selected` → capturé sur le form
+ #   via `data-action="grid-filter-bar:selected->grid-search#submit"` pour
+ #   déclencher le submit immédiat.
+ #   Les tokens actifs sont des <a href> qui rechargent le frame en retirant
+ #   le critère correspondant de l'URL.
+ #
+ # Mode Live Component (`live = true`) :
+ #   Pas de <form>. Chaque sélection dans le popover déclenche une LiveAction
+ #   `setFilter` avec `data-live-property-param` + `data-live-value-param`.
+ #   Le bouton "Tout effacer" déclenche `clearFilters` (LiveAction ajoutée par
+ #   le symfony-tdd-developer agent dans le même sprint).
+ #
+ # Architecture :
+ #   - Tokens (filtres actifs) : server-rendered depuis view.filter.*
+ #   - Popover : server-rendered depuis view.definition.filters (statique Twig)
+ #     + injection JS dynamique pour le filtrage temps-réel des choix
+ #   - JS (grid_filter_bar_controller) : orchestration popover uniquement,
+ #     jamais de logique domaine
+ #
+ # Params requis :
+ #   view  : GridView (fournit view.filter, view.definition.filters, view.definition.search)
+ #   live  : bool     (détermine le mode de binding)
+ #}
+
+{% set search = view.definition.search ?? null %}
+{% set filters = view.definition.filters ?? [] %}
+
+{#
+ # Construit la map `prefixes` pour le controller JS.
+ # Les widgets Search / Pills / Select / Toggle partagent le même shell
+ # déclaratif. DateRange reste hors tokenisation.
+ #}
+{% set prefixMap = {} %}
+{% for filter in filters %}
+    {% set filterType = filter.type.value ?? filter.type %}
+    {% set current = attribute(view.filter, filter.propertyName) %}
+    {% set hasValue = current is same as(false) or (current is not null and current != '') %}
+    {% if filterType == 'pills' or filterType == 'select' or filterType == 'toggle' %}
+        {% set prefixMap = prefixMap|merge({
+            (filter.propertyName): {
+                label: filter.label,
+                type: filterType,
+                choices: filter.choices,
+                active: filterType == 'toggle' ? (current ? true : false) : hasValue,
+                caption: filter.caption ?? null,
+                valueMonospace: filter.valueMonospace ?? false,
+                group: filter.group ?? null
+            }
+        }) %}
+    {% endif %}
+{% endfor %}
+
+{# Compte les filtres actifs (pour afficher le bouton "Tout effacer") #}
+{% set activeFilterCount = 0 %}
+{% for filter in filters %}
+    {% set filterType = filter.type.value ?? filter.type %}
+    {% set current = attribute(view.filter, filter.propertyName) %}
+    {% set hasValue = current is same as(false) or (current is not null and current != '') %}
+    {% if (filterType == 'pills' or filterType == 'select') and hasValue %}
+        {% set activeFilterCount = activeFilterCount + 1 %}
+    {% elseif filterType == 'toggle' and current %}
+        {% set activeFilterCount = activeFilterCount + 1 %}
+    {% endif %}
+{% endfor %}
+{% if search is not null and view.filter.q is defined and view.filter.q != '' %}
+    {% set activeFilterCount = activeFilterCount + 1 %}
+{% endif %}
+
+{# Compte les tokens actifs (pills/select/toggle + DateRange, pas search) pour le mode +N #}
+{% set activeTokenCount = 0 %}
+{% for filter in filters %}
+    {% set filterType = filter.type.value ?? filter.type %}
+    {% set current = attribute(view.filter, filter.propertyName) %}
+    {% set hasValue = current is same as(false) or (current is not null and current != '') %}
+    {% if (filterType == 'pills' or filterType == 'select') and hasValue %}
+        {% set activeTokenCount = activeTokenCount + 1 %}
+    {% elseif filterType == 'toggle' and current %}
+        {% set activeTokenCount = activeTokenCount + 1 %}
+    {% endif %}
+{% endfor %}
+
+{# DateRange : collecter les données pour le token résumé dans la barre #}
+{% set dateRangeTokenData = null %}
+{% for filter in filters %}
+    {% set filterType = filter.type.value ?? filter.type %}
+    {% if filterType == 'date_range' %}
+        {% set fromValue = attribute(view.filter, filter.propertyName ~ 'From') ?? attribute(view.filter, filter.propertyName ~ '_from') ?? '' %}
+        {% set toValue = attribute(view.filter, filter.propertyName ~ 'To') ?? attribute(view.filter, filter.propertyName ~ '_to') ?? '' %}
+        {% set hasFrom = fromValue is not null and fromValue != '' %}
+        {% set hasTo = toValue is not null and toValue != '' %}
+        {% if hasFrom or hasTo %}
+            {% set activeTokenCount = activeTokenCount + 1 %}
+            {% set dateRangeTokenData = {
+                label: filter.label,
+                propertyName: filter.propertyName,
+                fromFormatted: hasFrom ? (fromValue.format is defined ? fromValue.format('d/m') : fromValue|date('d/m')) : '…',
+                toFormatted: hasTo ? (toValue.format is defined ? toValue.format('d/m') : toValue|date('d/m')) : '…',
+                fromInputId: (live ? 'fb-live-dr-' : 'fb-dr-') ~ view.definition.name ~ '-' ~ filter.propertyName ~ '-from',
+            } %}
+        {% endif %}
+    {% endif %}
+{% endfor %}
+
+{% set maxVisible = (activeTokenCount >= 4) ? 3 : null %}
+
+{# ID unique pour le popover (aria-controls) #}
+{% set popoverId = 'fb-pop-' ~ view.definition.name %}
+
+{# Placeholder dynamique selon les filtres disponibles (labels humains) #}
+{% set placeholderLabels = [] %}
+{% for key, def in prefixMap %}
+    {% set placeholderLabels = placeholderLabels|merge([def.label ?? key]) %}
+{% endfor %}
+{% if placeholderLabels|length > 0 %}
+    {% set placeholder = 'Rechercher, ou taper ' ~ placeholderLabels[0:2]|map(l => l ~ ':')|join('  ') ~ '  …' %}
+{% else %}
+    {% set placeholder = search ? (search.placeholder ?? 'Rechercher…') : 'Rechercher…' %}
+{% endif %}
+
+{# ============================================================
+ # SVG icône recherche (réutilisée dans les deux modes)
+ # ============================================================ #}
+{% set searchIcon %}
+    <svg class="fb-search-icon" viewBox="0 0 24 24" aria-hidden="true"
+         fill="none" stroke="currentColor" stroke-width="1.6"
+         stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="7"/>
+        <path d="M20 20l-3.5-3.5"/>
+    </svg>
+{% endset %}
+
+{% if live %}
+    {# ============================================================
+     # Mode Live Component
+     # ============================================================ #}
+    <div {{ stimulus_controller('grid-filter-bar', { prefixes: prefixMap, debounce: search ? search.debounceMs : 300 }) }}>
+
+        {# ── Barre principale ── #}
+        <div class="fb-bar"
+             {{ stimulus_target('grid-filter-bar', 'bar') }}>
+
+            {{ searchIcon|raw }}
+
+            {# ── Tokens actifs ── #}
+            {% include '@QuoraeGrid/components/Grid/_filter_live.html.twig' with {
+                filters: filters,
+                view: view,
+                popoverMode: false,
+                maxVisible: maxVisible,
+                activeTokenCount: activeTokenCount,
+                dateRangeTokenData: dateRangeTokenData,
+            } only %}
+
+            {# ── Input de recherche + détection préfixe ── #}
+            {% include '@QuoraeGrid/components/Grid/_search_input.html.twig' with {
+                view: view,
+                live: true,
+                fbMode: true,
+                popoverId: popoverId,
+                placeholder: search ? (search.placeholder ?? placeholder) : placeholder,
+            } only %}
+
+            {# ── Indicateur raccourci / ── #}
+            <span class="fb-cmd-hint" aria-hidden="true">/</span>
+
+            {# ── Bouton Tout effacer ── #}
+            {% if activeFilterCount > 0 %}
+                <div class="fb-end">
+                    <button type="button"
+                            class="fb-clear"
+                            data-action="live#action:prevent"
+                            data-live-action-param="clearFilters">
+                        Tout effacer
+                    </button>
+                </div>
+            {% endif %}
+
+            {# ── Popover de suggestions ── #}
+            {% include '@QuoraeGrid/components/Grid/_filter_live.html.twig' with {
+                filters: filters,
+                view: view,
+                popoverMode: true,
+                popoverId: popoverId,
+                prefixMap: prefixMap,
+            } only %}
+        </div>
+
+        {# ── DateRange — hors tokenisation, sous la barre ── #}
+        {% for filter in filters %}
+            {% set filterType = filter.type.value ?? filter.type %}
+            {% if filterType == 'date_range' %}
+                {% set fromProp = filter.propertyName ~ 'From' %}
+                {% set toProp = filter.propertyName ~ 'To' %}
+                {% set fromValue = attribute(view.filter, fromProp) ?? attribute(view.filter, filter.propertyName ~ '_from') ?? '' %}
+                {% set toValue = attribute(view.filter, toProp) ?? attribute(view.filter, filter.propertyName ~ '_to') ?? '' %}
+                <div class="fb-daterange">
+                    <span class="fb-daterange-label">{{ filter.label }}</span>
+                    <label class="sr-only"
+                           for="fb-live-dr-{{ view.definition.name }}-{{ filter.propertyName }}-from">
+                        {{ filter.label }} — début
+                    </label>
+                    <input type="date"
+                           id="fb-live-dr-{{ view.definition.name }}-{{ filter.propertyName }}-from"
+                           data-model="{{ fromProp }}"
+                           value="{{ fromValue is not null and fromValue != '' ? (fromValue.format is defined ? fromValue.format('Y-m-d') : fromValue) : '' }}">
+                    <span class="fb-daterange-sep" aria-hidden="true">→</span>
+                    <label class="sr-only"
+                           for="fb-live-dr-{{ view.definition.name }}-{{ filter.propertyName }}-to">
+                        {{ filter.label }} — fin
+                    </label>
+                    <input type="date"
+                           id="fb-live-dr-{{ view.definition.name }}-{{ filter.propertyName }}-to"
+                           data-model="{{ toProp }}"
+                           value="{{ toValue is not null and toValue != '' ? (toValue.format is defined ? toValue.format('Y-m-d') : toValue) : '' }}">
+                </div>
+            {% endif %}
+        {% endfor %}
+
+        {# ── Screen reader announcer for filter bar state transitions ── #}
+        <span class="sr-only"
+              aria-live="polite"
+              aria-atomic="true"
+              data-live-ignore
+              {{ stimulus_target('grid-filter-bar', 'announcer') }}></span>
+    </div>
+
+{% else %}
+    {# ============================================================
+     # Mode Turbo Frame
+     # ============================================================ #}
+    <form method="get"
+          data-turbo-frame="{{ view.frameId }}"
+          data-turbo-action="replace"
+          {{ stimulus_action('grid-search', 'submit', 'grid-filter-bar:selected') }}
+          {{ stimulus_controller('grid-search', { debounce: search ? search.debounceMs : 300 })|stimulus_controller('grid-filter-bar', { prefixes: prefixMap }) }}>
+
+        {# Conserver la navigation interne : tous les params de l'URL qui ne
+           sont pas gérés par le framework (q / criteria / page / sort) sont
+           réinjectés en hidden. Sans cela, form method=get écrase le
+           querystring courant (tab=grand-livre etc.). #}
+        {% for key, value in app.request.query.all %}
+            {% if key not in ['q', 'criteria', 'p', 'sort'] %}
+                {% if value is iterable %}
+                    {% for subKey, subValue in value %}
+                        <input type="hidden" name="{{ key }}[{{ subKey }}]" value="{{ subValue }}">
+                    {% endfor %}
+                {% else %}
+                    <input type="hidden" name="{{ key }}" value="{{ value }}">
+                {% endif %}
+            {% endif %}
+        {% endfor %}
+
+        {# ── Barre principale ── #}
+        <div class="fb-bar"
+             {{ stimulus_target('grid-filter-bar', 'bar') }}>
+
+            {{ searchIcon|raw }}
+
+            {# ── Tokens actifs ── #}
+            {% include '@QuoraeGrid/components/Grid/_filter_turbo.html.twig' with {
+                filters: filters,
+                view: view,
+                popoverMode: false,
+                maxVisible: maxVisible,
+                activeTokenCount: activeTokenCount,
+                dateRangeTokenData: dateRangeTokenData,
+            } only %}
+
+            {# ── Input de recherche + détection préfixe ── #}
+            {% include '@QuoraeGrid/components/Grid/_search_input.html.twig' with {
+                view: view,
+                live: false,
+                fbMode: true,
+                popoverId: popoverId,
+                placeholder: search ? (search.placeholder ?? placeholder) : placeholder,
+            } only %}
+
+            {# ── Indicateur raccourci / ── #}
+            <span class="fb-cmd-hint" aria-hidden="true">/</span>
+
+            {# ── Bouton Tout effacer (Turbo : navigue vers l'URL sans critères) ── #}
+            {% if activeFilterCount > 0 %}
+                {% set clearUrl = path(
+                    app.request.attributes.get('_route'),
+                    app.request.attributes.get('_route_params') ?? {}
+                ) %}
+                {# Préserver les params non-Grid dans l'URL de reset #}
+                {% set clearParams = {} %}
+                {% for key, value in app.request.query.all %}
+                    {% if key not in ['q', 'criteria', 'p', 'sort'] %}
+                        {% set clearParams = clearParams|merge({ (key): value }) %}
+                    {% endif %}
+                {% endfor %}
+                {% if clearParams|length > 0 %}
+                    {% set clearUrl = path(
+                        app.request.attributes.get('_route'),
+                        (app.request.attributes.get('_route_params') ?? {})|merge(clearParams)
+                    ) %}
+                {% endif %}
+                <div class="fb-end">
+                    <a href="{{ clearUrl }}"
+                       class="fb-clear"
+                       data-turbo-frame="{{ view.frameId }}"
+                       data-turbo-action="replace">
+                        Tout effacer
+                    </a>
+                </div>
+            {% endif %}
+
+            {# ── Popover de suggestions ── #}
+            {% include '@QuoraeGrid/components/Grid/_filter_turbo.html.twig' with {
+                filters: filters,
+                view: view,
+                popoverMode: true,
+                popoverId: popoverId,
+                prefixMap: prefixMap,
+            } only %}
+        </div>
+
+        {# ── DateRange — hors tokenisation, sous la barre ── #}
+        {% for filter in filters %}
+            {% set filterType = filter.type.value ?? filter.type %}
+            {% if filterType == 'date_range' %}
+                {% set fromValue = attribute(view.filter, filter.propertyName ~ 'From') ?? attribute(view.filter, filter.propertyName ~ '_from') ?? '' %}
+                {% set toValue = attribute(view.filter, filter.propertyName ~ 'To') ?? attribute(view.filter, filter.propertyName ~ '_to') ?? '' %}
+                <div class="fb-daterange">
+                    <span class="fb-daterange-label">{{ filter.label }}</span>
+                    <label class="sr-only"
+                           for="fb-dr-{{ view.definition.name }}-{{ filter.propertyName }}-from">
+                        {{ filter.label }} — début
+                    </label>
+                    <input type="date"
+                           id="fb-dr-{{ view.definition.name }}-{{ filter.propertyName }}-from"
+                           name="criteria[{{ filter.propertyName }}_from]"
+                           value="{{ fromValue is not null and fromValue != '' ? (fromValue.format is defined ? fromValue.format('Y-m-d') : fromValue) : '' }}"
+                           data-action="change->grid-search#submit">
+                    <span class="fb-daterange-sep" aria-hidden="true">→</span>
+                    <label class="sr-only"
+                           for="fb-dr-{{ view.definition.name }}-{{ filter.propertyName }}-to">
+                        {{ filter.label }} — fin
+                    </label>
+                    <input type="date"
+                           id="fb-dr-{{ view.definition.name }}-{{ filter.propertyName }}-to"
+                           name="criteria[{{ filter.propertyName }}_to]"
+                           value="{{ toValue is not null and toValue != '' ? (toValue.format is defined ? toValue.format('Y-m-d') : toValue) : '' }}"
+                           data-action="change->grid-search#submit">
+                </div>
+            {% endif %}
+        {% endfor %}
+
+        {# ── Screen reader announcer for filter bar state transitions ── #}
+        <span class="sr-only"
+              aria-live="polite"
+              aria-atomic="true"
+              {{ stimulus_target('grid-filter-bar', 'announcer') }}></span>
+    </form>
+{% endif %}

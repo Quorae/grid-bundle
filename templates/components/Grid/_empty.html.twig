@@ -1,0 +1,9 @@
+{#
+ # Grid framework — état vide.
+ # Rendu quand `view.response.rows` est vide. Le message est configurable
+ # via `#[AsGrid(emptyMessage: "…")]` (défaut : "Aucun élément.").
+ #}
+
+<div class="grid-empty" role="status">
+    <p>{{ view.definition.emptyMessage ?? 'Aucun élément.' }}</p>
+</div>

@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace Quorae\GridBundle;
 
 use Quorae\GridBundle\Attribute\AsGrid;
+use Quorae\GridBundle\Contract\BulkActionHandler;
+use Quorae\GridBundle\Contract\BulkOwnershipValidator;
+use Quorae\GridBundle\Contract\ChoicesProviderInterface;
+use Quorae\GridBundle\Contract\GridDataSource;
 use Quorae\GridBundle\DependencyInjection\QuoraeGridExtension;
 use Quorae\GridBundle\Registry\GridRegistryCompilerPass;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -29,6 +33,22 @@ final class QuoraeGridBundle extends AbstractBundle
             AsGrid::class,
             GridRegistryCompilerPass::attributeTagger(),
         );
+
+        // AICD `services.yaml` _instanceof block, applied bundle-wide so host
+        // App services (repositories implementing the contracts, grid choices
+        // providers, bulk handlers) are auto-tagged without a host kernel edit
+        // (port-map §1.4 / §4.2). `_instanceof` inside the bundle's loaded
+        // services.php only covers bundle-internal services — host services
+        // defined in the app's own services.yaml need this global
+        // registerForAutoconfiguration hook.
+        $container->registerForAutoconfiguration(GridDataSource::class)
+            ->addTag('quorae_grid.data_source');
+        $container->registerForAutoconfiguration(ChoicesProviderInterface::class)
+            ->addTag('quorae_grid.choices_provider');
+        $container->registerForAutoconfiguration(BulkActionHandler::class)
+            ->addTag('quorae_grid.bulk_action_handler');
+        $container->registerForAutoconfiguration(BulkOwnershipValidator::class)
+            ->addTag('quorae_grid.ownership_validator');
 
         $container->addCompilerPass(new GridRegistryCompilerPass());
     }

@@ -1,0 +1,86 @@
+{#
+ # Grid framework — macros utilitaires partagées.
+ #
+ # Ces macros isolent la logique de rendu inter-partials (signatures Ledger
+ # par ligne, choix du cell partial selon le Formatter) pour garder les
+ # templates principaux (`grid.html.twig`, `live_grid.html.twig`) lisibles.
+ #
+ # Contrat :
+ #   - row_classes(row, view) → string CSS à poser sur un <tr>
+ #   - cell_partial(formatter) → string chemin du partial cell
+ #   - column_classes(column) → string classes CSS pour th/td d'une colonne
+ #   - sort_indicator(view, column) → HTML des icônes de tri
+ #}
+
+{#
+ # Calcule les classes CSS à appliquer à un <tr>.
+ # Délègue à `grid_row_classes` (cf. `Quorae\GridBundle\Twig\GridExtension`).
+ #}
+{% macro row_classes(row, view) -%}
+    {{- grid_row_classes(row, view.definition) -}}
+{%- endmacro %}
+
+{#
+ # Retourne le chemin du partial cell à rendre pour un Formatter enum.
+ # Le mapping est 1:1 avec `Formatter::value` (snake_case natif de l'enum).
+ # Fallback sur `_plain.html.twig` si le formatter est absent (défensif).
+ #}
+{% macro cell_partial(formatter) -%}
+    {%- set slug = formatter.value ?? formatter ?? 'plain' -%}
+    {{- '@QuoraeGrid/components/Grid/cell/_' ~ slug ~ '.html.twig' -}}
+{%- endmacro %}
+
+{#
+ # Calcule les classes CSS pour un th ou td de colonne.
+ # Élimine la duplication du pattern set+merge×2 dans les 2 templates.
+ #}
+{% macro column_classes(column) -%}
+    {%- set classes = [] -%}
+    {%- if column.class %}{% set classes = classes|merge([column.class]) %}{% endif -%}
+    {%- if column.hideOnMobile %}{% set classes = classes|merge(['hide-mobile']) %}{% endif -%}
+    {{- classes|join(' ') -}}
+{%- endmacro %}
+
+{#
+ # Calcule les classes du wrapper de contenu d'une cellule.
+ # Troncature mono-ligne par défaut ; opt-out minimal pour les colonnes
+ # intrinsèques / interactives (`actions-col`).
+ #}
+{% macro cell_content_classes(column) -%}
+    {%- set classes = ['grid-cell-content'] -%}
+    {%- set columnClass = column.class ?? '' -%}
+    {%- if columnClass matches '/(^|\\s)actions-col(\\s|$)/' -%}
+        {%- set classes = classes|merge(['grid-cell-content--intrinsic']) -%}
+    {%- endif -%}
+    {{- classes|join(' ') -}}
+{%- endmacro %}
+
+{#
+ # Rend l'icône indicatrice de tri pour une colonne sortable.
+ # Partagée par grid.html.twig (<a>) et live_grid.html.twig (<button>).
+ #}
+{% macro sort_indicator(view, column) -%}
+    {%- set isActive = view.sort is not null and view.sort.column == column.sortable -%}
+    {%- if not isActive -%}
+        <twig:ux:icon name="heroicons:chevron-up-down-16-solid" class="grid-sort-indicator grid-sort-inactive" />
+    {%- elseif view.sort.direction == 'asc' -%}
+        <twig:ux:icon name="heroicons:chevron-up-16-solid" class="grid-sort-indicator grid-sort-active" />
+    {%- else -%}
+        <twig:ux:icon name="heroicons:chevron-down-16-solid" class="grid-sort-indicator grid-sort-active" />
+    {%- endif -%}
+    {%- if isActive -%}
+        <span class="sr-only">(trié {{ view.sort.direction == 'asc' ? 'croissant' : 'décroissant' }})</span>
+    {%- endif -%}
+{%- endmacro %}
+
+{#
+ # Rend l'icône de fermeture (×) utilisée par les tokens de la filter bar.
+ # Partagée par _filter_live.html.twig et _filter_turbo.html.twig.
+ #}
+{% macro close_icon() -%}
+    <svg width="10" height="10" viewBox="0 0 24 24" aria-hidden="true"
+         fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round">
+        <path d="M6 6l12 12M18 6l-12 12"/>
+    </svg>
+{%- endmacro %}

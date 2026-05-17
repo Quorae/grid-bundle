@@ -5,7 +5,26 @@
     "private": true,
     "version": "1.0.0",
     "symfony": {
-        "controllers": {},
+        "controllers": {
+            "grid_search": {
+                "main": "controllers/grid_search_controller.js",
+                "name": "grid-search",
+                "fetch": "lazy",
+                "enabled": true
+            },
+            "grid_filter_bar": {
+                "main": "controllers/grid_filter_bar_controller.js",
+                "name": "grid-filter-bar",
+                "fetch": "lazy",
+                "enabled": true
+            },
+            "expandable_grid": {
+                "main": "controllers/expandable_grid_controller.js",
+                "name": "expandable-grid",
+                "fetch": "lazy",
+                "enabled": true
+            }
+        },
         "importmap": {
             "@hotwired/stimulus": "^3.0"
         }

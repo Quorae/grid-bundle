@@ -1,0 +1,168 @@
+{#
+ # Grid framework — paginator.
+ #
+ # Mode Turbo Frame (`live = false`) :
+ #   Liens <a href="?p=N"> avec `data-turbo-frame="{{ view.frameId }}"`.
+ #   Le backend conserve les autres params (q, criteria[...]) via l'URL courante.
+ #
+ # Mode Live Component (`live = true`) :
+ #   Boutons déclenchant l'action `goToPage` exposée par `LiveGrid` :
+ #     #[LiveAction]
+ #     public function goToPage(#[LiveArg] int $page): void { $this->page = $page; }
+ #
+ # Params :
+ #   view : GridView
+ #   live : bool
+ #
+ # Deux régimes :
+ #   - PrevNext (totalCount / totalPages null) : aucun COUNT(*) → prev/next
+ #     uniquement + numéro de page courant indicatif (`Page N`).
+ #   - Offset (totalCount / totalPages non null) : pagination numérotée
+ #     fenêtrée (premier, dernier, ±2 autour de la page courante, ellipses)
+ #     + caption « Page X / Y — N résultats ».
+ #}
+
+{% set response = view.response %}
+{% set hasPrev = response.hasPrev %}
+{% set hasNext = response.hasNext %}
+{% set page = response.page %}
+{% set totalPages = response.totalPages %}
+{% set totalCount = response.totalCount %}
+{% set isOffset = totalPages is not null and totalCount is not null %}
+
+{#
+ # Fenêtre de pages numérotées : premier, dernier, ±2 autour du courant,
+ # ellipses entre les segments non contigus. `pageWindow` est une liste où
+ # `0` matérialise une ellipse (jamais une page valide, base 1).
+ #}
+{% set pageWindow = [] %}
+{% if isOffset %}
+    {% set _lo = max(1, page - 2) %}
+    {% set _hi = min(totalPages, page + 2) %}
+    {% if _lo > 1 %}
+        {% set pageWindow = pageWindow|merge([1]) %}
+        {% if _lo > 2 %}{% set pageWindow = pageWindow|merge([0]) %}{% endif %}
+    {% endif %}
+    {% for _p in _lo.._hi %}
+        {% set pageWindow = pageWindow|merge([_p]) %}
+    {% endfor %}
+    {% if _hi < totalPages %}
+        {% if _hi < totalPages - 1 %}{% set pageWindow = pageWindow|merge([0]) %}{% endif %}
+        {% set pageWindow = pageWindow|merge([totalPages]) %}
+    {% endif %}
+{% endif %}
+
+<nav class="grid-paginator" aria-label="Pagination du listing">
+    {% if live %}
+        {# --- Live Component --- #}
+        {% if hasPrev %}
+            <button type="button"
+                    class="grid-paginator-btn"
+                    data-action="live#action:prevent"
+                    data-live-action-param="goToPage"
+                    data-live-page-param="{{ page - 1 }}"
+                    rel="prev">
+                ← Précédent
+            </button>
+        {% else %}
+            <span class="grid-paginator-btn disabled" aria-disabled="true">← Précédent</span>
+        {% endif %}
+
+        {% if isOffset %}
+            <span class="grid-paginator-pages">
+                {% for p in pageWindow %}
+                    {% if p == 0 %}
+                        <span class="grid-paginator-ellipsis" aria-hidden="true">…</span>
+                    {% elseif p == page %}
+                        <span class="grid-paginator-page grid-paginator-page--current" aria-current="page">{{ p }}</span>
+                    {% else %}
+                        <button type="button"
+                                class="grid-paginator-page"
+                                data-action="live#action:prevent"
+                                data-live-action-param="goToPage"
+                                data-live-page-param="{{ p }}"
+                                aria-label="Page {{ p }}">{{ p }}</button>
+                    {% endif %}
+                {% endfor %}
+            </span>
+            <span class="grid-paginator-info">
+                Page <span class="num">{{ page }}</span> / <span class="num">{{ totalPages }}</span> — <span class="num">{{ totalCount }}</span> résultats
+            </span>
+        {% else %}
+            <span class="grid-paginator-info">
+                Page <span class="num">{{ page }}</span>{% if totalPages is not null %} / <span class="num">{{ totalPages }}</span>{% endif %}
+            </span>
+        {% endif %}
+
+        {% if hasNext %}
+            <button type="button"
+                    class="grid-paginator-btn"
+                    data-action="live#action:prevent"
+                    data-live-action-param="goToPage"
+                    data-live-page-param="{{ page + 1 }}"
+                    rel="next">
+                Suivant →
+            </button>
+        {% else %}
+            <span class="grid-paginator-btn disabled" aria-disabled="true">Suivant →</span>
+        {% endif %}
+    {% else %}
+        {# --- Turbo Frame ---
+           Les liens prev/next réinjectent tout le querystring courant (q, criteria[...],
+           sort) en n'y remplaçant que `p` — sinon le filtre actif est perdu dès la
+           2e page. data-turbo-action="advance" pousse l'historique navigateur. #}
+        {% set route = app.request.attributes.get('_route') %}
+        {% set routeParams = app.request.attributes.get('_route_params') ?? {} %}
+        {% set queryParams = app.request.query.all %}
+        {% set prevUrl = path(route, routeParams|merge(queryParams|merge({ (view.pageParam): page - 1 }))) %}
+        {% set nextUrl = path(route, routeParams|merge(queryParams|merge({ (view.pageParam): page + 1 }))) %}
+
+        {% if hasPrev %}
+            <a class="grid-paginator-btn"
+               href="{{ prevUrl }}"
+               data-turbo-frame="{{ view.frameId }}"
+               rel="prev">
+                ← Précédent
+            </a>
+        {% else %}
+            <span class="grid-paginator-btn disabled" aria-disabled="true">← Précédent</span>
+        {% endif %}
+
+        {% if isOffset %}
+            <span class="grid-paginator-pages">
+                {% for p in pageWindow %}
+                    {% if p == 0 %}
+                        <span class="grid-paginator-ellipsis" aria-hidden="true">…</span>
+                    {% elseif p == page %}
+                        <span class="grid-paginator-page grid-paginator-page--current" aria-current="page">{{ p }}</span>
+                    {% else %}
+                        {% set pageUrl = path(route, routeParams|merge(queryParams|merge({ (view.pageParam): p }))) %}
+                        <a class="grid-paginator-page"
+                           href="{{ pageUrl }}"
+                           data-turbo-frame="{{ view.frameId }}"
+                           data-turbo-action="advance"
+                           aria-label="Page {{ p }}">{{ p }}</a>
+                    {% endif %}
+                {% endfor %}
+            </span>
+            <span class="grid-paginator-info">
+                Page <span class="num">{{ page }}</span> / <span class="num">{{ totalPages }}</span> — <span class="num">{{ totalCount }}</span> résultats
+            </span>
+        {% else %}
+            <span class="grid-paginator-info">
+                Page <span class="num">{{ page }}</span>{% if totalPages is not null %} / <span class="num">{{ totalPages }}</span>{% endif %}
+            </span>
+        {% endif %}
+
+        {% if hasNext %}
+            <a class="grid-paginator-btn"
+               href="{{ nextUrl }}"
+               data-turbo-frame="{{ view.frameId }}"
+               rel="next">
+                Suivant →
+            </a>
+        {% else %}
+            <span class="grid-paginator-btn disabled" aria-disabled="true">Suivant →</span>
+        {% endif %}
+    {% endif %}
+</nav>

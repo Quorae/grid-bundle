@@ -1,0 +1,24 @@
+{#
+ # Grid cell · Formatter::Chip — pastille colorée (warn, danger, info, accent, default).
+ #
+ # La variante est déduite depuis :
+ #   1. `column.template` si défini (ex. `template: 'warn'` → `.chip.warn`)
+ #   2. Sinon `'default'`.
+ #
+ # Si l'auteur a besoin d'une variante par-ligne (ex. chip statut dont la
+ # couleur dépend de la row), la bonne route est `Formatter::Twig` avec un
+ # template custom qui délègue à `@QuoraeGrid/components/Grid/cell/_chip.html.twig` ou
+ # qui émet directement son propre balisage `.chip.<variant>`.
+ #
+ # Params :
+ #   value  : string (label affiché)
+ #   row    : ligne courante (non utilisée ici, fournie par le shell)
+ #   column : ColumnDefinition (column.template pilote la variante)
+ #}
+{%- set variant = column.template ?? 'default' -%}
+
+{%- if value is null or value == '' -%}
+    —
+{%- else -%}
+    <span class="chip {{ variant }}">{{ value }}</span>
+{%- endif -%}

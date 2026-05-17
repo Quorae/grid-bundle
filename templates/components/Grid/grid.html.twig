@@ -1,0 +1,160 @@
+{#
+ # Grid framework — shell Turbo Frame (mode interactive: false).
+ #
+ # Consommé par `<twig:Grid:Grid :view="..." />`, le composant PHP résolu dans
+ # `Quorae\GridBundle\Twig\Components\Grid` avec
+ # `#[AsTwigComponent(name: 'Grid:Grid', template: '@QuoraeGrid/components/Grid/grid.html.twig')]`.
+ #
+ # Contrat : la variable `view` est un `Quorae\GridBundle\Dto\GridView` exposant
+ #   - view.definition : GridDefinition (name, pagination, perPage, interactive,
+ #                       emptyMessage, renderRow, columns, filters, search, rowSignatures, layout?)
+ #   - view.response   : GridResponse (rows, hasNext, hasPrev, page)
+ #   - view.filter     : FilterDto hydraté (q, criteria…)
+ #   - view.sort       : ?SortOrder { column, direction }
+ #   - view.frameId    : 'grid-<name>'
+ #
+ # État = QueryString (Turbo Frame) : `?q=...&criteria[<k>]=<v>&p=N&sort=col:dir`.
+ # Tous les liens et forms internes pointent vers le même `data-turbo-frame`.
+ #
+ # Signatures Ledger §3.7.4 : ligne total/anomaly/subtotal → classes calculées
+ # par la macro `_macros.row_classes()`, CSS dans `grid.css`.
+ #}
+
+{% import '@QuoraeGrid/components/Grid/_macros.html.twig' as grid %}
+
+<turbo-frame id="{{ view.frameId }}" data-grid-name="{{ view.definition.name }}" data-turbo-action="advance">
+    <div class="grid-container">
+        {# Filter bar (search + filtres) — rendue seulement s'il y a au moins
+           un filtre ou la search. Le form intercepte submit + turbo-frame. #}
+        {% set hasSearch = view.definition.search is defined and view.definition.search is not null %}
+        {% set hasFilters = view.definition.filters|length > 0 %}
+
+        {% if hasSearch or hasFilters %}
+            {% include '@QuoraeGrid/components/Grid/_filter_bar.html.twig' with {
+                view: view,
+                live: false,
+            } only %}
+        {% endif %}
+
+        {% if view.response.rows|length == 0 %}
+            {% include '@QuoraeGrid/components/Grid/_empty.html.twig' with { view: view } only %}
+        {% elseif view.definition.renderRow is defined and view.definition.renderRow %}
+            {# Custom layout — pas de `<table>` : le partial est souverain sur
+               son DOM. Chaque row est inclus dans un conteneur générique
+               `<ul class="grid-cards">` pour préserver la sémantique liste. #}
+            <ul class="grid-cards" aria-label="{{ view.definition.name }}">
+                {% for row in view.response.rows %}
+                    {% include view.definition.renderRow with {
+                        row: row,
+                        view: view,
+                    } only %}
+                {% endfor %}
+            </ul>
+        {% else %}
+            <div class="grid-scroll">
+                <table class="grid-table" aria-label="{{ view.definition.name }}">
+                    <thead>
+                        <tr>
+                            {% if view.definition.expandable is defined and view.definition.expandable %}
+                                <th scope="col" class="grid-cell-chevron" aria-label="Expansion"></th>
+                            {% endif %}
+                            {% for column in view.definition.columns %}
+                                <th scope="col" class="{{ grid.column_classes(column) }}"{% if column.colWidth %} style="width: {{ column.colWidth }}"{% endif %}>
+                                    {% if column.sortable %}
+                                        {% set isActive = view.sort is not null and view.sort.column == column.sortable %}
+                                        {% set nextDirection = (isActive and view.sort.direction == 'asc') ? 'desc' : 'asc' %}
+                                        {% set sortRoute = app.request.attributes.get('_route') %}
+                                        {% set sortRouteParams = app.request.attributes.get('_route_params') ?? {} %}
+                                        {% set sortQueryParams = app.request.query.all %}
+                                        {% set sortUrl = path(sortRoute, sortRouteParams|merge(sortQueryParams|merge({ sort: column.sortable ~ ':' ~ nextDirection, (view.pageParam): 1 }))) %}
+                                        <a href="{{ sortUrl }}"
+                                           class="grid-sort{{ isActive ? ' grid-sort--active' : '' }}"
+                                           data-turbo-action="replace"
+                                           aria-label="Trier par {{ column.label }} {{ nextDirection == 'asc' ? 'croissant' : 'décroissant' }}">
+                                            <span class="grid-header-label">{{ column.label }}</span>
+                                            {{ grid.sort_indicator(view, column) }}
+                                        </a>
+                                    {% else %}
+                                        <span class="grid-header-label">{{ column.label }}</span>
+                                    {% endif %}
+                                </th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody{% if view.definition.expandable is defined and view.definition.expandable %} data-controller="expandable-grid"{% endif %}>
+                        {% set isExpandable = view.definition.expandable is defined and view.definition.expandable %}
+                        {% for row in view.response.rows %}
+                            {% set rowClasses = grid.row_classes(row, view) %}
+                            {% set rowLink = view.definition.rowLink %}
+                            {% if isExpandable %}
+                                {% set expandRowId = attribute(row, view.definition.expandRouteParam)|default('') %}
+                                <tr{% if rowClasses %} class="{{ rowClasses }}"{% endif %}
+                                    data-action="click->expandable-grid#toggle"
+                                    data-expandable-grid-id-param="{{ expandRowId }}"
+                                    style="cursor: pointer">
+                            {% elseif rowLink %}
+                                {% set rowHref = url(rowLink.route, { (rowLink.param): attribute(row, rowLink.rowProperty) }) %}
+                                {% if rowLink.ariaLabel and rowLink.ariaLabelField %}
+                                    {% set rowAriaLabel = rowLink.ariaLabel|format(attribute(row, rowLink.ariaLabelField)) %}
+                                {% else %}
+                                    {% set rowAriaLabel = null %}
+                                {% endif %}
+                                <tr{% if rowClasses %} class="{{ rowClasses }}"{% endif %}
+                                    data-href="{{ rowHref }}"
+                                    data-controller="row-link"
+                                    tabindex="0"
+                                    {% if rowAriaLabel %}aria-label="{{ rowAriaLabel }}"{% endif %}>
+                            {% else %}
+                                <tr{% if rowClasses %} class="{{ rowClasses }}"{% endif %}>
+                            {% endif %}
+                                {% if isExpandable %}
+                                    <td class="grid-cell-chevron">
+                                        <span class="grid-chevron"
+                                              data-expandable-grid-target="chevron"
+                                              data-row-id="{{ expandRowId }}"
+                                              aria-expanded="false">&#9656;</span>
+                                    </td>
+                                {% endif %}
+                                {% for column in view.definition.columns %}
+                                    <td class="{{ grid.column_classes(column) }}" data-label="{{ column.label }}">
+                                        <div class="{{ grid.cell_content_classes(column) }}">
+                                            {% include grid.cell_partial(column.formatter) with {
+                                                value: attribute(row, column.propertyName),
+                                                row: row,
+                                                column: column,
+                                            } only %}
+                                        </div>
+                                    </td>
+                                {% endfor %}
+                            </tr>
+                            {% if isExpandable %}
+                                <tr class="grid-expand-panel" hidden
+                                    data-expandable-grid-target="panel"
+                                    data-row-id="{{ expandRowId }}">
+                                    <td colspan="{{ view.definition.columns|length + 1 }}">
+                                        <turbo-frame
+                                            id="grid-expand-{{ view.definition.name }}-{{ expandRowId }}"
+                                            src="{{ path(view.definition.expandRoute, { (view.definition.expandRouteParam): expandRowId }) }}"
+                                            loading="lazy">
+                                            <div class="grid-expand-skeleton">
+                                                <div class="grid-expand-skeleton__bar"></div>
+                                                <div class="grid-expand-skeleton__bar grid-expand-skeleton__bar--short"></div>
+                                            </div>
+                                        </turbo-frame>
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if view.response.hasPrev or view.response.hasNext %}
+                {% include '@QuoraeGrid/components/Grid/_paginator.html.twig' with {
+                    view: view,
+                    live: false,
+                } only %}
+            {% endif %}
+        {% endif %}
+    </div>
+</turbo-frame>

@@ -1,3 +1,19 @@
 {
-    "controllers": {}
+    "controllers": {
+        "@quorae/grid-bundle": {
+            "grid_search": {
+                "enabled": true,
+                "fetch": "lazy"
+            },
+            "grid_filter_bar": {
+                "enabled": true,
+                "fetch": "lazy"
+            },
+            "expandable_grid": {
+                "enabled": true,
+                "fetch": "lazy"
+            }
+        }
+    },
+    "entrypoints": []
 }

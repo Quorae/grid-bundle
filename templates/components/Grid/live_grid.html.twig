@@ -1,0 +1,231 @@
+{#
+ # Grid framework — shell Live Component (mode interactive: true).
+ #
+ # Consommé par `<twig:Grid:LiveGrid :gridName="..." />`, le composant Live dans
+ # `Quorae\GridBundle\Twig\Components\LiveGrid` avec
+ # `#[AsLiveComponent(name: 'Grid:LiveGrid', template: '@QuoraeGrid/components/Grid/live_grid.html.twig')]`.
+ #
+ # Rend le même output HTML que `grid.html.twig` mais sans <turbo-frame> :
+ #   - Les changements de filtre déclenchent un re-render serveur via
+ #     `data-model="<property>"` (ou `data-model="debounce(300)|q"` pour
+ #     l'input search).
+ #   - Les actions par ligne (dismiss/delete) sont déclarées sur
+ #     une classe `XxxGridActions` à côté de `XxxGrid` et câblées via
+ #     `data-action="live#action"` + `data-live-action-param`.
+ #
+ # Pas d'URL partageable par défaut — acceptable pour les listings concernés
+ # (anomalies, chat, mémos en édition). Si l'URL partageable est requise,
+ # basculer en `interactive: false` et utiliser `grid.html.twig`.
+ #}
+
+{% import '@QuoraeGrid/components/Grid/_macros.html.twig' as grid %}
+
+<div {{ attributes.defaults({ class: 'grid-container' }) }}
+     data-live-label="grid-{{ view.definition.name }}">
+    {% set hasSearch = view.definition.search is defined and view.definition.search is not null %}
+    {% set hasFilters = view.definition.filters|length > 0 %}
+    {# Bulk actions — activées dès que la GridDefinition déclare ≥ 1 action.
+       `selectedIds` est une LiveProp writable exposée par LiveGrid (v.LivePropp
+       au template). `rowIdProperty` indique où lire l'ID sur chaque row. #}
+    {% set bulkActions = view.definition.bulkActions|default([]) %}
+    {% set hasBulkActions = bulkActions|length > 0 %}
+    {% set rowIdProperty = view.definition.rowIdProperty|default(null) %}
+
+    {% if flashMessage is defined and flashMessage is not null %}
+        <div class="grid-flash grid-flash--{{ flashType|default('info') }}" role="alert">
+            <span>{{ flashMessage }}</span>
+        </div>
+    {% endif %}
+
+    {% if hasSearch or hasFilters %}
+        {% include '@QuoraeGrid/components/Grid/_filter_bar.html.twig' with {
+            view: view,
+            live: true,
+        } only %}
+    {% endif %}
+
+    {% if hasBulkActions %}
+        {# Collecte des IDs de la page courante — passés au bouton « tout cocher
+           cette page ». Si `rowIdProperty` est null, on n'active pas ce bouton. #}
+        {% set visibleRowIds = null %}
+        {% if rowIdProperty is not null %}
+            {% set visibleRowIds = [] %}
+            {% for row in view.response.rows %}
+                {% set visibleRowIds = visibleRowIds|merge([attribute(row, rowIdProperty)]) %}
+            {% endfor %}
+        {% endif %}
+        {% include '@QuoraeGrid/components/Grid/_bulk_action_bar.html.twig' with {
+            view: view,
+            selectedIds: selectedIds|default([]),
+            visibleRowIds: visibleRowIds,
+        } only %}
+    {% endif %}
+
+    {% if view.response.rows|length == 0 %}
+        {% include '@QuoraeGrid/components/Grid/_empty.html.twig' with { view: view } only %}
+    {% elseif view.definition.renderRow is defined and view.definition.renderRow %}
+        {# Custom layout — le partial est souverain sur son DOM (cf. mémos en
+           cartes). Miroir du pattern `grid.html.twig` pour garantir un HTML
+           sémantique identique entre modes Turbo et Live. #}
+        <ul class="grid-cards" aria-label="{{ view.definition.name }}">
+            {% for row in view.response.rows %}
+                {% include view.definition.renderRow with {
+                    row: row,
+                    view: view,
+                    hasBulkActions: hasBulkActions,
+                    rowIdProperty: rowIdProperty,
+                    extraContext: extraContext|default({}),
+                } only %}
+            {% endfor %}
+        </ul>
+
+        {% if view.response.hasPrev or view.response.hasNext %}
+            {% include '@QuoraeGrid/components/Grid/_paginator.html.twig' with {
+                view: view,
+                live: true,
+            } only %}
+        {% endif %}
+    {% else %}
+        {% set isExpandable = view.definition.expandable is defined and view.definition.expandable %}
+        <div class="grid-scroll"{% if isExpandable %} data-controller="expandable-grid"{% endif %}>
+            <table class="grid-table"
+                   aria-label="{{ view.definition.name }}">
+                <thead>
+                    <tr>
+                        {% if isExpandable %}
+                            <th scope="col" class="grid-cell-chevron" aria-label="Expansion"></th>
+                        {% endif %}
+                        {% if hasBulkActions %}
+                            {# Colonne checkbox — uniquement en mode tabulaire. #}
+                            <th scope="col" class="grid-select-cell" aria-label="Sélection">
+                                <span class="sr-only">Sélectionner une ligne</span>
+                            </th>
+                        {% endif %}
+                        {% for column in view.definition.columns %}
+                            <th scope="col" class="{{ grid.column_classes(column) }}"{% if column.colWidth %} style="width: {{ column.colWidth }}"{% endif %}>
+                                {% if column.sortable %}
+                                    {# Live : délègue à une LiveAction `sort` côté composant.
+                                       On passe la colonne et la direction voulue en LiveArg. #}
+                                    {% set isActive = view.sort is not null and view.sort.column == column.sortable %}
+                                    {% set nextDirection = (isActive and view.sort.direction == 'asc') ? 'desc' : 'asc' %}
+                                    <button type="button"
+                                            class="grid-sort{{ isActive ? ' grid-sort--active' : '' }}"
+                                            data-action="live#action:prevent"
+                                            data-live-action-param="sort"
+                                            data-live-column-param="{{ column.sortable }}"
+                                            data-live-direction-param="{{ nextDirection }}"
+                                            aria-label="Trier par {{ column.label }} {{ nextDirection == 'asc' ? 'croissant' : 'décroissant' }}">
+                                        <span class="grid-header-label">{{ column.label }}</span>
+                                        {{ grid.sort_indicator(view, column) }}
+                                    </button>
+                                {% else %}
+                                    <span class="grid-header-label">{{ column.label }}</span>
+                                {% endif %}
+                            </th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% set _groupBy = view.definition.groupBy|default(null) %}
+                    {% set _isGrouped = _groupBy is not null and attribute(view.filter, _groupBy) is null %}
+                    {% set _groupLabelProp = view.definition.groupLabelProperty|default(_groupBy) %}
+                    {% set _colSpan = view.definition.columns|length + (isExpandable ? 1 : 0) + (hasBulkActions ? 1 : 0) %}
+                    {% for row in view.response.rows %}
+                        {% if _isGrouped %}
+                            {% set _currentGroup = attribute(row, _groupBy) %}
+                            {% set _prevGroup = loop.first ? null : attribute(view.response.rows[loop.index0 - 1], _groupBy) %}
+                            {% if _currentGroup != _prevGroup %}
+                                {% set _groupLabel = attribute(row, _groupLabelProp)|default(_currentGroup) %}
+                                {% set _groupCount = view.response.groupCounts[_currentGroup]|default(0) %}
+                                <tr class="grid-group-header" aria-label="Groupe : {{ _groupLabel }}">
+                                    <td colspan="{{ _colSpan }}">
+                                        <div class="grid-group-header__content">
+                                            <span class="grid-group-header__label">{{ _groupLabel }}</span>
+                                            <span class="grid-group-header__count">{{ _groupCount }}</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        {% endif %}
+                        {% set rowClasses = grid.row_classes(row, view) %}
+                        {% if isExpandable %}
+                            {% set expandRowId = attribute(row, view.definition.expandRouteParam)|default('') %}
+                            {% set isExpanded = expandedRowId is defined and expandedRowId is not null and expandedRowId == expandRowId %}
+                            <tr class="{{ [rowClasses, isExpanded ? 'grid-row--expanded' : '']|join(' ')|trim }}"
+                                data-action="click->expandable-grid#toggle"
+                                data-expandable-grid-id-param="{{ expandRowId }}"
+                                style="cursor: pointer">
+                        {% else %}
+                            <tr{% if rowClasses %} class="{{ rowClasses }}"{% endif %}>
+                        {% endif %}
+                            {% if isExpandable %}
+                                <td class="grid-cell-chevron">
+                                    <span class="grid-chevron"
+                                          data-expandable-grid-target="chevron"
+                                          data-row-id="{{ expandRowId }}"
+                                          aria-expanded="{{ isExpanded ? 'true' : 'false' }}">&#9656;</span>
+                                </td>
+                            {% endif %}
+                            {% if hasBulkActions %}
+                                {# Injection checkbox en première colonne, mode tabulaire.
+                                   Le rowIdProperty indique le nom de propriété
+                                   sur le row DTO (défaut `id` si non défini). #}
+                                {% set rowId = attribute(row, rowIdProperty ?? 'id') %}
+                                <td class="grid-select-cell" data-label="Sélection">
+                                    <div class="grid-cell-content grid-cell-content--intrinsic">
+                                        {% include '@QuoraeGrid/components/Grid/_bulk_select_checkbox.html.twig' with {
+                                            rowId: rowId,
+                                            variant: 'cell',
+                                        } only %}
+                                    </div>
+                                </td>
+                            {% endif %}
+                            {% for column in view.definition.columns %}
+                                <td class="{{ grid.column_classes(column) }}" data-label="{{ column.label }}">
+                                    <div class="{{ grid.cell_content_classes(column) }}">
+                                        {% include grid.cell_partial(column.formatter) with {
+                                            value: attribute(row, column.propertyName),
+                                            row: row,
+                                            column: column,
+                                        } only %}
+                                    </div>
+                                </td>
+                            {% endfor %}
+                        </tr>
+                        {% if isExpandable %}
+                            <tr class="grid-expand-panel"
+                                {{ isExpanded ? '' : 'hidden' }}
+                                data-expandable-grid-target="panel"
+                                data-row-id="{{ expandRowId }}">
+                                <td colspan="{{ view.definition.columns|length + 1 + (hasBulkActions ? 1 : 0) }}">
+                                    <turbo-frame
+                                        id="grid-expand-{{ view.definition.name }}-{{ expandRowId }}"
+                                        src="{{ path(view.definition.expandRoute, { (view.definition.expandRouteParam): expandRowId }) }}"
+                                        loading="lazy">
+                                        <div class="grid-expand-skeleton">
+                                            <div class="grid-expand-skeleton__bar"></div>
+                                            <div class="grid-expand-skeleton__bar grid-expand-skeleton__bar--short"></div>
+                                        </div>
+                                    </turbo-frame>
+                                </td>
+                            </tr>
+                        {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% if isExpandable %}
+                <input type="hidden"
+                       data-model="expandedRowId"
+                       value="{{ expandedRowId|default('') }}"
+                       data-expandable-grid-target="syncInput">
+            {% endif %}
+        </div>
+
+        {% if view.response.hasPrev or view.response.hasNext %}
+            {% include '@QuoraeGrid/components/Grid/_paginator.html.twig' with {
+                view: view,
+                live: true,
+            } only %}
+        {% endif %}
+    {% endif %}
+</div>

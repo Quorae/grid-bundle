@@ -1,0 +1,18 @@
+{#
+ # Grid cell · Formatter::DateFr — date au format français `DD/MM/YYYY`.
+ #
+ # Accepte :
+ #   - \DateTimeInterface
+ #   - string (lancé tel quel à `|date()`)
+ #   - null → tiret cadratin
+ #
+ # Émet un <time datetime="…"> pour le SEO / a11y (lecture par les screen
+ # readers via attribut `datetime` au format ISO 8601).
+ #
+ # Params : value, row, column
+ #}
+{%- if value is null or value == '' -%}
+    —
+{%- else -%}
+    <time datetime="{{ value|date('c') }}">{{ value|date('d/m/Y') }}</time>
+{%- endif -%}
