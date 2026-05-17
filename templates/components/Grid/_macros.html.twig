@@ -62,11 +62,11 @@
 {% macro sort_indicator(view, column) -%}
     {%- set isActive = view.sort is not null and view.sort.column == column.sortable -%}
     {%- if not isActive -%}
-        <twig:ux:icon name="heroicons:chevron-up-down-16-solid" class="grid-sort-indicator grid-sort-inactive" />
+        <svg class="grid-sort-indicator grid-sort-inactive" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8 1a.75.75 0 0 1 .53.22l3 3a.75.75 0 0 1-1.06 1.06L8 2.81 5.53 5.28a.75.75 0 0 1-1.06-1.06l3-3A.75.75 0 0 1 8 1Zm-3.53 9.72a.75.75 0 0 1 1.06 0L8 13.19l2.47-2.47a.75.75 0 1 1 1.06 1.06l-3 3a.75.75 0 0 1-1.06 0l-3-3a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
     {%- elseif view.sort.direction == 'asc' -%}
-        <twig:ux:icon name="heroicons:chevron-up-16-solid" class="grid-sort-indicator grid-sort-active" />
+        <svg class="grid-sort-indicator grid-sort-active" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M11.78 9.78a.75.75 0 0 1-1.06 0L8 7.06 5.28 9.78a.75.75 0 0 1-1.06-1.06l3.25-3.25a.75.75 0 0 1 1.06 0l3.25 3.25a.75.75 0 0 1 0 1.06Z" clip-rule="evenodd"/></svg>
     {%- else -%}
-        <twig:ux:icon name="heroicons:chevron-down-16-solid" class="grid-sort-indicator grid-sort-active" />
+        <svg class="grid-sort-indicator grid-sort-active" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
     {%- endif -%}
     {%- if isActive -%}
         <span class="sr-only">(trié {{ view.sort.direction == 'asc' ? 'croissant' : 'décroissant' }})</span>
