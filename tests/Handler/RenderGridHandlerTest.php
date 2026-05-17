@@ -386,6 +386,32 @@ final class RenderGridHandlerTest extends TestCase
         self::assertSame(99999, $dataSource->capturedPage->number);
     }
 
+    public function testEmptyOffsetGridOnPageOneIsNotReclampedAndDoesNotCrash(): void
+    {
+        // Zero rows → data source reports totalPages = 0. Page 1 must survive
+        // untouched (no spurious re-fetch, no Page(number: 0) crash).
+        $dataSource = new PaginatedDataSource(totalRows: 0, perPage: 10);
+        $handler = $this->handlerForOffsetGrid($dataSource);
+
+        $view = $handler->handle('fixture_offset_paginated', Request::create('/'));
+
+        self::assertSame(1, $view->response->page);
+        self::assertCount(0, $view->response->rows);
+        self::assertSame([1], $dataSource->fetchedPages);
+    }
+
+    public function testEmptyOffsetGridOutOfRangePageClampsToPageOneNotZero(): void
+    {
+        $dataSource = new PaginatedDataSource(totalRows: 0, perPage: 10);
+        $handler = $this->handlerForOffsetGrid($dataSource);
+
+        $view = $handler->handle('fixture_offset_paginated', Request::create('/', 'GET', ['p' => '5']));
+
+        self::assertSame(1, $view->response->page);
+        self::assertCount(0, $view->response->rows);
+        self::assertSame([5, 1], $dataSource->fetchedPages);
+    }
+
     private function handlerForOffsetGrid(PaginatedDataSource $dataSource): RenderGridHandler
     {
         $registry = new GridRegistry(

@@ -34,7 +34,9 @@ final class PaginatedDataSource implements GridDataSource
         \assert($filter instanceof CamelCaseFilter);
         $this->fetchedPages[] = $page->number;
 
-        $totalPages = (int) max(1, (int) ceil($this->totalRows / $this->perPage));
+        // Mirrors a real Offset data source: an empty result set reports
+        // totalPages = 0 (not 1) — the edge case that must not crash the clamp.
+        $totalPages = (int) ceil($this->totalRows / $this->perPage);
         $offset = ($page->number - 1) * $this->perPage;
         $remaining = max(0, $this->totalRows - $offset);
         $rowsOnPage = min($this->perPage, $remaining);

@@ -92,12 +92,20 @@ class RenderGridHandler
         GridResponse $response,
     ): GridResponse {
         $totalPages = $response->totalPages;
-        if ($totalPages === null || $page->number <= $totalPages) {
+        if ($totalPages === null) {
+            return $response;
+        }
+
+        // An empty Offset result legitimately reports totalPages = 0; its
+        // valid "last page" is page 1 (which shows zero rows). Flooring to 1
+        // also keeps `new Page()` valid (it requires number >= 1).
+        $lastPage = max(1, $totalPages);
+        if ($page->number <= $lastPage) {
             return $response;
         }
 
         $clampedPage = new Page(
-            number: $totalPages,
+            number: $lastPage,
             limit: $page->limit,
             sort: $page->sort,
         );
