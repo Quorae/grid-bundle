@@ -1,0 +1,16 @@
+{
+    "name": "@quorae/grid-bundle",
+    "description": "Stimulus controllers for quorae/grid-bundle (grid search, filter bar, expandable rows).",
+    "license": "MIT",
+    "private": true,
+    "version": "1.0.0",
+    "symfony": {
+        "controllers": {},
+        "importmap": {
+            "@hotwired/stimulus": "^3.0"
+        }
+    },
+    "peerDependencies": {
+        "@hotwired/stimulus": "^3.0"
+    }
+}

@@ -1,0 +1,7 @@
+/vendor/
+/composer.lock
+/.phpunit.cache/
+/var/
+.claude/settings.local.json
+.claude/agent-memory/
+.claude/tasks/
