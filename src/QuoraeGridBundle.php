@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Quorae\GridBundle;
 
+use Quorae\GridBundle\Attribute\AsGrid;
 use Quorae\GridBundle\DependencyInjection\QuoraeGridExtension;
+use Quorae\GridBundle\Registry\GridRegistryCompilerPass;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Extension\ExtensionInterface;
 use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
@@ -20,12 +22,18 @@ final class QuoraeGridBundle extends AbstractBundle
     {
         parent::build($container);
 
-        // WP-2: register GridRegistryCompilerPass + #[AsGrid] attribute autoconfig here
-        // (see port-map §1.3 — deferred until Registry\GridRegistryCompilerPass exists so
-        //  the kernel boots cleanly with zero grid classes in WP-1).
+        // Moved here from AICD Kernel::build() (port-map §1.3/§4.2): the bundle
+        // is self-contained — no host kernel edit. Auto-tag every `#[AsGrid]`
+        // class so the compiler pass discovers them without manual wiring.
+        $container->registerAttributeForAutoconfiguration(
+            AsGrid::class,
+            GridRegistryCompilerPass::attributeTagger(),
+        );
+
+        $container->addCompilerPass(new GridRegistryCompilerPass());
     }
 
-    public function getContainerExtension(): ?ExtensionInterface
+    public function getContainerExtension(): ExtensionInterface
     {
         return new QuoraeGridExtension();
     }

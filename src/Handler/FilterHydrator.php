@@ -1,0 +1,190 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Quorae\GridBundle\Handler;
+
+use Quorae\GridBundle\Definition\GridDefinition;
+use Symfony\Component\HttpFoundation\Request;
+
+/**
+ * Hydrates the filter DTO declared on a grid definition from the HTTP
+ * request and runtime context.
+ *
+ * Responsibilities:
+ *  - Merge raw values from `?q=`, `?criteria[<key>]=<val>`, and `$extraContext`
+ *  - Instantiate the filter DTO through reflection on its constructor
+ *  - Coerce scalar string values from query strings into typed constructor parameters
+ *  - Fall back to safe defaults when user-supplied values are invalid
+ *
+ * Extracted from {@see RenderGridHandler} to respect SRP — the handler
+ * orchestrates the grid rendering pipeline, this service handles DTO hydration.
+ */
+final readonly class FilterHydrator
+{
+    public function __construct(
+        private ScalarCoercer $coercer,
+    ) {
+    }
+
+    /**
+     * @param array<string, mixed> $extraContext overrides for filter properties
+     *                                           that are never exposed in the
+     *                                           query string (e.g. `clientId`)
+     */
+    public function hydrate(GridDefinition $definition, Request $request, array $extraContext = []): object
+    {
+        $filterClass = $definition->filterClass;
+
+        $raw = $this->collectRawValues($request, $extraContext);
+
+        if ($filterClass === \stdClass::class) {
+            $filter = new \stdClass();
+            foreach ($raw as $key => $value) {
+                $filter->{$key} = $value;
+            }
+
+            return $filter;
+        }
+
+        $filterReflection = new \ReflectionClass($filterClass);
+        $constructor = $filterReflection->getConstructor();
+        if ($constructor === null) {
+            return $filterReflection->newInstance();
+        }
+
+        $declaredFilterProperties = $this->buildDeclaredPropertyIndex($definition);
+        $arguments = [];
+        foreach ($constructor->getParameters() as $parameter) {
+            $name = $parameter->getName();
+            $arguments[$name] = $this->resolveConstructorArgument(
+                parameter: $parameter,
+                raw: $raw,
+                declaredInGrid: isset($declaredFilterProperties[$name]),
+            );
+        }
+
+        try {
+            return $filterReflection->newInstanceArgs($arguments);
+        } catch (\InvalidArgumentException|\ValueError|\TypeError) {
+            return $this->instantiateWithSafeDefaults(
+                constructor: $constructor,
+                filterReflection: $filterReflection,
+                extraContext: $extraContext,
+            );
+        }
+    }
+
+    /**
+     * @param \ReflectionClass<object> $filterReflection
+     * @param array<string, mixed>     $extraContext
+     */
+    private function instantiateWithSafeDefaults(
+        \ReflectionMethod $constructor,
+        \ReflectionClass $filterReflection,
+        array $extraContext,
+    ): object {
+        $arguments = [];
+        foreach ($constructor->getParameters() as $parameter) {
+            $name = $parameter->getName();
+            if (\array_key_exists($name, $extraContext)) {
+                $type = $parameter->getType();
+                if ($type instanceof \ReflectionNamedType) {
+                    $coerced = $this->coercer->coerce($extraContext[$name], $type);
+                    $arguments[$name] = $coerced === null && !$type->allowsNull()
+                        ? $this->defaultFor($parameter)
+                        : $coerced;
+                    continue;
+                }
+                $arguments[$name] = $extraContext[$name];
+                continue;
+            }
+            $arguments[$name] = $this->defaultFor($parameter);
+        }
+
+        return $filterReflection->newInstanceArgs($arguments);
+    }
+
+    /**
+     * @return array<string, true>
+     */
+    private function buildDeclaredPropertyIndex(GridDefinition $definition): array
+    {
+        $index = [];
+        foreach ($definition->filters as $filter) {
+            $index[$filter->propertyName] = true;
+        }
+        if ($definition->search !== null) {
+            $index[$definition->search->propertyName] = true;
+        }
+
+        return $index;
+    }
+
+    /**
+     * @param array<string, mixed> $extraContext
+     *
+     * @return array<string, mixed>
+     */
+    private function collectRawValues(Request $request, array $extraContext): array
+    {
+        $raw = [];
+
+        $query = $request->query;
+        $qValue = $query->get('q');
+        if (\is_string($qValue)) {
+            $raw['q'] = $qValue;
+        }
+
+        $criteria = $query->all('criteria');
+        foreach ($criteria as $key => $value) {
+            if (!\is_string($key)) {
+                continue;
+            }
+            $raw[$key] = $value;
+        }
+
+        foreach ($extraContext as $key => $value) {
+            $raw[$key] = $value;
+        }
+
+        return $raw;
+    }
+
+    /**
+     * @param array<string, mixed> $raw
+     */
+    private function resolveConstructorArgument(\ReflectionParameter $parameter, array $raw, bool $declaredInGrid): mixed
+    {
+        $name = $parameter->getName();
+
+        if (!\array_key_exists($name, $raw)) {
+            return $this->defaultFor($parameter);
+        }
+
+        $rawValue = $raw[$name];
+        $type = $parameter->getType();
+        if (!$type instanceof \ReflectionNamedType) {
+            return $rawValue;
+        }
+
+        $coerced = $this->coercer->coerce($rawValue, $type);
+        if ($coerced === null && !$type->allowsNull()) {
+            return $this->defaultFor($parameter);
+        }
+
+        return $coerced;
+    }
+
+    private function defaultFor(\ReflectionParameter $parameter): mixed
+    {
+        if ($parameter->isDefaultValueAvailable()) {
+            return $parameter->getDefaultValue();
+        }
+        if ($parameter->allowsNull()) {
+            return null;
+        }
+
+        throw new \InvalidArgumentException(\sprintf('Cannot hydrate required parameter "$%s" — no value in request and no default.', $parameter->getName()));
+    }
+}
