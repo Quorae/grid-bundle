@@ -6,7 +6,9 @@ namespace Quorae\GridBundle\Handler;
 
 use Quorae\GridBundle\Contract\GridDataSource;
 use Quorae\GridBundle\Definition\GridDefinition;
+use Quorae\GridBundle\Dto\GridResponse;
 use Quorae\GridBundle\Dto\GridView;
+use Quorae\GridBundle\Dto\Page;
 use Quorae\GridBundle\Exception\MissingDataSourceException;
 use Quorae\GridBundle\Registry\GridRegistry;
 use Psr\Container\ContainerInterface;
@@ -58,6 +60,7 @@ class RenderGridHandler
         $page = $this->pageParser->parse($definition, $request);
 
         $response = $dataSource->fetch($filter, $page);
+        $response = $this->clampToLastPage($dataSource, $filter, $page, $response);
 
         return new GridView(
             definition: $runtimeDefinition,
@@ -67,6 +70,39 @@ class RenderGridHandler
             frameId: \sprintf('grid-%s', $definition->name),
             pageParam: PageParser::PAGE_PARAM,
         );
+    }
+
+    /**
+     * Re-clamps an out-of-range page (spec §9).
+     *
+     * `PageParser` cannot clamp to `[1, totalPages]` because `totalPages` is
+     * unknown until the data source returns. When the response carries a
+     * known `totalPages` and the requested page overshoots it, re-fetch once
+     * at the last page so the rows and the paginator agree — instead of
+     * surfacing an empty grid.
+     *
+     * PrevNext data sources report `totalPages = null` (no `COUNT(*)`) and are
+     * left untouched; Timeline reports `totalPages = 1` with the page already
+     * floored to 1 by `PageParser`, so the guard never triggers there either.
+     */
+    private function clampToLastPage(
+        GridDataSource $dataSource,
+        object $filter,
+        Page $page,
+        GridResponse $response,
+    ): GridResponse {
+        $totalPages = $response->totalPages;
+        if ($totalPages === null || $page->number <= $totalPages) {
+            return $response;
+        }
+
+        $clampedPage = new Page(
+            number: $totalPages,
+            limit: $page->limit,
+            sort: $page->sort,
+        );
+
+        return $dataSource->fetch($filter, $clampedPage);
     }
 
     private function resolveDataSource(GridDefinition $definition): GridDataSource

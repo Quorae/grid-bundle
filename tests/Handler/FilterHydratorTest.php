@@ -12,6 +12,7 @@ use Quorae\GridBundle\Enum\Pagination;
 use Quorae\GridBundle\Enum\SearchMode;
 use Quorae\GridBundle\Handler\FilterHydrator;
 use Quorae\GridBundle\Handler\ScalarCoercer;
+use Quorae\GridBundle\Tests\Fixtures\CamelCaseFilter;
 use Quorae\GridBundle\Tests\Fixtures\DummyFilter;
 use Quorae\GridBundle\Tests\Fixtures\DummyStatus;
 use Quorae\GridBundle\Tests\Fixtures\InMemoryDataSource;
@@ -128,6 +129,121 @@ final class FilterHydratorTest extends TestCase
 
         self::assertInstanceOf(DummyFilter::class, $filter);
         self::assertSame(42, $filter->clientId);
+    }
+
+    public function testBridgesSnakeCaseCriteriaKeyToCamelCaseConstructorParam(): void
+    {
+        $definition = $this->buildCamelCaseDefinition();
+        $request = Request::create('/', 'GET', [
+            'criteria' => ['date_from' => '2026-03-01', 'date_to' => '2026-03-31'],
+        ]);
+
+        $filter = $this->hydrator->hydrate($definition, $request);
+
+        self::assertInstanceOf(CamelCaseFilter::class, $filter);
+        self::assertSame('2026-03-01', $filter->dateFrom);
+        self::assertSame('2026-03-31', $filter->dateTo);
+    }
+
+    public function testExactCamelCaseCriteriaKeyStillWinsForBackwardCompatibility(): void
+    {
+        $definition = $this->buildCamelCaseDefinition();
+        $request = Request::create('/', 'GET', [
+            'criteria' => ['dateFrom' => '2026-03-01'],
+        ]);
+
+        $filter = $this->hydrator->hydrate($definition, $request);
+
+        self::assertInstanceOf(CamelCaseFilter::class, $filter);
+        self::assertSame('2026-03-01', $filter->dateFrom);
+    }
+
+    public function testExactCamelCaseKeyTakesPrecedenceWhenBothFormsPresent(): void
+    {
+        $definition = $this->buildCamelCaseDefinition();
+        $request = Request::create('/', 'GET', [
+            'criteria' => ['dateFrom' => 'exact-wins', 'date_from' => 'snake-loses'],
+        ]);
+
+        $filter = $this->hydrator->hydrate($definition, $request);
+
+        self::assertInstanceOf(CamelCaseFilter::class, $filter);
+        self::assertSame('exact-wins', $filter->dateFrom);
+    }
+
+    public function testBridgeAlsoWorksForNonDateMultiWordProperty(): void
+    {
+        $definition = $this->buildCamelCaseDefinition();
+        $request = Request::create('/', 'GET', [
+            'criteria' => ['client_name' => 'ACME Corp'],
+        ]);
+
+        $filter = $this->hydrator->hydrate($definition, $request);
+
+        self::assertInstanceOf(CamelCaseFilter::class, $filter);
+        self::assertSame('ACME Corp', $filter->clientName);
+    }
+
+    public function testSingleWordParamsRemainUnaffectedByBridge(): void
+    {
+        $definition = $this->buildCamelCaseDefinition();
+        $request = Request::create('/', 'GET', [
+            'q' => 'search-term',
+            'criteria' => ['classe' => '4'],
+        ]);
+
+        $filter = $this->hydrator->hydrate($definition, $request);
+
+        self::assertInstanceOf(CamelCaseFilter::class, $filter);
+        self::assertSame('search-term', $filter->q);
+        self::assertSame(4, $filter->classe);
+    }
+
+    public function testUnrelatedParamsStayAtDefaultWhenOnlySnakeKeyProvided(): void
+    {
+        $definition = $this->buildCamelCaseDefinition();
+        $request = Request::create('/', 'GET', [
+            'criteria' => ['date_from' => '2026-03-01'],
+        ]);
+
+        $filter = $this->hydrator->hydrate($definition, $request);
+
+        self::assertInstanceOf(CamelCaseFilter::class, $filter);
+        self::assertNull($filter->dateTo);
+        self::assertNull($filter->clientName);
+        self::assertNull($filter->classe);
+    }
+
+    private function buildCamelCaseDefinition(): GridDefinition
+    {
+        return new GridDefinition(
+            name: 'test_camel',
+            dataSource: InMemoryDataSource::class,
+            filterClass: CamelCaseFilter::class,
+            pagination: Pagination::PrevNext,
+            perPage: 25,
+            interactive: false,
+            emptyMessage: '',
+            renderRow: null,
+            columns: [],
+            filters: [
+                new FilterDefinition(
+                    propertyName: 'date',
+                    type: FilterType::DateRange,
+                    label: 'Période',
+                    choices: [],
+                    choicesProvider: null,
+                ),
+            ],
+            search: new SearchDefinition(
+                propertyName: 'q',
+                fields: [],
+                placeholder: 'Search',
+                mode: SearchMode::Contains,
+                debounceMs: 300,
+            ),
+            rowSignatures: [],
+        );
     }
 
     private function buildDefinition(): GridDefinition

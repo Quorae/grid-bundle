@@ -158,11 +158,12 @@ final readonly class FilterHydrator
     {
         $name = $parameter->getName();
 
-        if (!\array_key_exists($name, $raw)) {
+        $rawKey = $this->matchRawKey($name, $raw);
+        if ($rawKey === null) {
             return $this->defaultFor($parameter);
         }
 
-        $rawValue = $raw[$name];
+        $rawValue = $raw[$rawKey];
         $type = $parameter->getType();
         if (!$type instanceof \ReflectionNamedType) {
             return $rawValue;
@@ -174,6 +175,38 @@ final readonly class FilterHydrator
         }
 
         return $coerced;
+    }
+
+    /**
+     * Resolves which raw key feeds a constructor parameter.
+     *
+     * The rendered filter UI emits snake_case query-string keys
+     * (`criteria[date_from]`) while filter DTO constructors declare
+     * camelCase parameters (`dateFrom`) — see the §7-frozen public contract.
+     * Exact match wins so any already-working camelCase key never regresses;
+     * the snake_case form of the parameter name is the documented fallback.
+     *
+     * @param array<string, mixed> $raw
+     */
+    private function matchRawKey(string $parameterName, array $raw): ?string
+    {
+        if (\array_key_exists($parameterName, $raw)) {
+            return $parameterName;
+        }
+
+        $snakeName = $this->camelToSnake($parameterName);
+        if ($snakeName !== $parameterName && \array_key_exists($snakeName, $raw)) {
+            return $snakeName;
+        }
+
+        return null;
+    }
+
+    private function camelToSnake(string $value): string
+    {
+        $snake = preg_replace('/[A-Z]/', '_$0', $value);
+
+        return strtolower($snake ?? $value);
     }
 
     private function defaultFor(\ReflectionParameter $parameter): mixed

@@ -19,6 +19,8 @@ use Quorae\GridBundle\Tests\Fixtures\CompleteGrid;
 use Quorae\GridBundle\Tests\Fixtures\DummyFilter;
 use Quorae\GridBundle\Tests\Fixtures\InMemoryDataSource;
 use Quorae\GridBundle\Tests\Fixtures\MinimalGrid;
+use Quorae\GridBundle\Tests\Fixtures\OffsetPaginatedGrid;
+use Quorae\GridBundle\Tests\Fixtures\PaginatedDataSource;
 use Quorae\GridBundle\Tests\Fixtures\ProviderBackedFilterGrid;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
@@ -325,6 +327,81 @@ final class RenderGridHandlerTest extends TestCase
         self::assertSame(42, $provider->capturedFilter->clientId);
         self::assertSame(['clientId' => 42], $provider->capturedExtraContext);
         self::assertSame([], $registry->get('fixture_provider_backed')->filters[0]->choices);
+    }
+
+    public function testClampsOutOfRangePageToLastPageForOffsetGrid(): void
+    {
+        // 25 rows, perPage 10 → 3 pages. Request page 99999.
+        $dataSource = new PaginatedDataSource(totalRows: 25, perPage: 10);
+        $handler = $this->handlerForOffsetGrid($dataSource);
+
+        $view = $handler->handle('fixture_offset_paginated', Request::create('/', 'GET', ['p' => '99999']));
+
+        self::assertSame(3, $view->response->page);
+        self::assertSame(3, $view->response->totalPages);
+        // Last page holds the 5 trailing rows (21..25).
+        self::assertCount(5, $view->response->rows);
+        self::assertSame('21', $view->response->rows[0]->code);
+        self::assertFalse($view->response->hasNext);
+        self::assertTrue($view->response->hasPrev);
+        // The handler must re-fetch at the clamped page so the paginator + rows agree.
+        self::assertSame([99999, 3], $dataSource->fetchedPages);
+    }
+
+    public function testInRangePageIsNotReclampedForOffsetGrid(): void
+    {
+        $dataSource = new PaginatedDataSource(totalRows: 25, perPage: 10);
+        $handler = $this->handlerForOffsetGrid($dataSource);
+
+        $view = $handler->handle('fixture_offset_paginated', Request::create('/', 'GET', ['p' => '2']));
+
+        self::assertSame(2, $view->response->page);
+        self::assertCount(10, $view->response->rows);
+        self::assertSame('11', $view->response->rows[0]->code);
+        // No re-fetch — a single fetch at the requested page.
+        self::assertSame([2], $dataSource->fetchedPages);
+    }
+
+    public function testLastPageBoundaryIsNotReclamped(): void
+    {
+        $dataSource = new PaginatedDataSource(totalRows: 30, perPage: 10);
+        $handler = $this->handlerForOffsetGrid($dataSource);
+
+        $view = $handler->handle('fixture_offset_paginated', Request::create('/', 'GET', ['p' => '3']));
+
+        self::assertSame(3, $view->response->page);
+        self::assertSame([3], $dataSource->fetchedPages);
+    }
+
+    public function testPrevNextGridWithoutTotalPagesIsNeverReclamped(): void
+    {
+        // InMemoryDataSource returns totalPages = null → clamp must not engage.
+        $dataSource = new InMemoryDataSource();
+        $handler = $this->handlerForCompleteGrid($dataSource);
+
+        $view = $handler->handle('fixture_complete', Request::create('/', 'GET', ['p' => '99999']));
+
+        self::assertSame(99999, $view->response->page);
+        self::assertNotNull($dataSource->capturedPage);
+        self::assertSame(99999, $dataSource->capturedPage->number);
+    }
+
+    private function handlerForOffsetGrid(PaginatedDataSource $dataSource): RenderGridHandler
+    {
+        $registry = new GridRegistry(
+            ['fixture_offset_paginated' => OffsetPaginatedGrid::class],
+            new GridDefinitionResolver(),
+        );
+
+        return new RenderGridHandler(
+            registry: $registry,
+            dataSources: new ServiceLocator([
+                PaginatedDataSource::class => static fn (): PaginatedDataSource => $dataSource,
+            ]),
+            choicesProviders: new ServiceLocator([]),
+            filterHydrator: new FilterHydrator(new ScalarCoercer()),
+            pageParser: new PageParser(),
+        );
     }
 
     private function handlerForCompleteGrid(InMemoryDataSource $dataSource): RenderGridHandler
