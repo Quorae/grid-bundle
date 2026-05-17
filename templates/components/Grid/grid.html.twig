@@ -93,7 +93,11 @@
                                     data-expandable-grid-id-param="{{ expandRowId }}"
                                     style="cursor: pointer">
                             {% elseif rowLink %}
-                                {% set rowHref = url(rowLink.route, { (rowLink.param): attribute(row, rowLink.rowProperty) }) %}
+                                {% set routeParams = {} %}
+                                {% for routeParam, rowProp in rowLink.routeParamNames %}
+                                    {% set routeParams = routeParams|merge({(routeParam): attribute(row, rowProp)}) %}
+                                {% endfor %}
+                                {% set rowHref = url(rowLink.route, routeParams) %}
                                 {% if rowLink.ariaLabel and rowLink.ariaLabelField %}
                                     {% set rowAriaLabel = rowLink.ariaLabel|format(attribute(row, rowLink.ariaLabelField)) %}
                                 {% else %}
@@ -103,6 +107,7 @@
                                     data-href="{{ rowHref }}"
                                     data-controller="row-link"
                                     data-action="click->row-link#click keydown->row-link#keydown"
+                                    {% if rowLink.frame %}data-row-link-frame-value="{{ rowLink.frame }}"{% endif %}
                                     tabindex="0"
                                     {% if rowAriaLabel %}aria-label="{{ rowAriaLabel }}"{% endif %}>
                             {% else %}

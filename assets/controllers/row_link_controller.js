@@ -4,11 +4,15 @@ import { isInteractiveDescendant } from '../src/interactive_descendant';
 /**
  * Row-link controller — makes a `<tr>` navigable via its `data-href`.
  *
- * Mounted on each `<tr>` that carries a `#[RowLink]` attribute.
- * Navigates on click (unless the target is an interactive descendant)
- * and on Enter/Space keypress (the row has `tabindex="0"`).
+ * When `frameValue` is set, loads the URL into the named Turbo Frame
+ * instead of performing a full-page navigation. This enables modal/panel
+ * patterns without coupling the grid bundle to any specific UI.
  */
 export default class extends Controller {
+    static values = {
+        frame: { type: String, default: '' },
+    };
+
     connect() {
         this.element.style.cursor = 'pointer';
     }
@@ -30,8 +34,16 @@ export default class extends Controller {
 
     #navigate() {
         const href = this.element.dataset.href;
-        if (href) {
-            window.location.href = href;
+        if (!href) return;
+
+        if (this.frameValue) {
+            const frame = document.getElementById(this.frameValue);
+            if (frame) {
+                frame.src = href;
+                return;
+            }
         }
+
+        window.location.href = href;
     }
 }
