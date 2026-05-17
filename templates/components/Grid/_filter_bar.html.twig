@@ -99,8 +99,8 @@
             {% set dateRangeTokenData = {
                 label: filter.label,
                 propertyName: filter.propertyName,
-                fromFormatted: hasFrom ? (fromValue.format is defined ? fromValue.format('d/m') : fromValue|date('d/m')) : '…',
-                toFormatted: hasTo ? (toValue.format is defined ? toValue.format('d/m') : toValue|date('d/m')) : '…',
+                fromFormatted: hasFrom ? fromValue|safe_date_fr('d/m') : '…',
+                toFormatted: hasTo ? toValue|safe_date_fr('d/m') : '…',
                 fromInputId: (live ? 'fb-live-dr-' : 'fb-dr-') ~ view.definition.name ~ '-' ~ filter.propertyName ~ '-from',
             } %}
         {% endif %}
@@ -208,7 +208,7 @@
                     <input type="date"
                            id="fb-live-dr-{{ view.definition.name }}-{{ filter.propertyName }}-from"
                            data-model="{{ fromProp }}"
-                           value="{{ fromValue is not null and fromValue != '' ? (fromValue.format is defined ? fromValue.format('Y-m-d') : fromValue) : '' }}">
+                           value="{{ fromValue is not null and fromValue != '' ? fromValue|safe_date_fr('Y-m-d') : '' }}">
                     <span class="fb-daterange-sep" aria-hidden="true">→</span>
                     <label class="sr-only"
                            for="fb-live-dr-{{ view.definition.name }}-{{ filter.propertyName }}-to">
@@ -217,7 +217,7 @@
                     <input type="date"
                            id="fb-live-dr-{{ view.definition.name }}-{{ filter.propertyName }}-to"
                            data-model="{{ toProp }}"
-                           value="{{ toValue is not null and toValue != '' ? (toValue.format is defined ? toValue.format('Y-m-d') : toValue) : '' }}">
+                           value="{{ toValue is not null and toValue != '' ? toValue|safe_date_fr('Y-m-d') : '' }}">
                 </div>
             {% endif %}
         {% endfor %}
@@ -338,7 +338,7 @@
                     <input type="date"
                            id="fb-dr-{{ view.definition.name }}-{{ filter.propertyName }}-from"
                            name="criteria[{{ filter.propertyName }}_from]"
-                           value="{{ fromValue is not null and fromValue != '' ? (fromValue.format is defined ? fromValue.format('Y-m-d') : fromValue) : '' }}"
+                           value="{{ fromValue is not null and fromValue != '' ? fromValue|safe_date_fr('Y-m-d') : '' }}"
                            data-action="change->grid-search#submit">
                     <span class="fb-daterange-sep" aria-hidden="true">→</span>
                     <label class="sr-only"
@@ -348,7 +348,7 @@
                     <input type="date"
                            id="fb-dr-{{ view.definition.name }}-{{ filter.propertyName }}-to"
                            name="criteria[{{ filter.propertyName }}_to]"
-                           value="{{ toValue is not null and toValue != '' ? (toValue.format is defined ? toValue.format('Y-m-d') : toValue) : '' }}"
+                           value="{{ toValue is not null and toValue != '' ? toValue|safe_date_fr('Y-m-d') : '' }}"
                            data-action="change->grid-search#submit">
                 </div>
             {% endif %}
