@@ -66,6 +66,12 @@
         {% set activeFilterCount = activeFilterCount + 1 %}
     {% elseif filterType == 'toggle' and current %}
         {% set activeFilterCount = activeFilterCount + 1 %}
+    {% elseif filterType == 'date_range' %}
+        {% set drFrom = attribute(view.filter, filter.propertyName ~ 'From') ?? attribute(view.filter, filter.propertyName ~ '_from') ?? '' %}
+        {% set drTo = attribute(view.filter, filter.propertyName ~ 'To') ?? attribute(view.filter, filter.propertyName ~ '_to') ?? '' %}
+        {% if (drFrom is not null and drFrom != '') or (drTo is not null and drTo != '') %}
+            {% set activeFilterCount = activeFilterCount + 1 %}
+        {% endif %}
     {% endif %}
 {% endfor %}
 {% if search is not null and view.filter.q is defined and view.filter.q != '' %}
@@ -88,13 +94,12 @@
 {% endfor %}
 
 {# DateRange : collecter les données pour le token résumé dans la barre.
-   Le token ne s'affiche que si l'URL contient explicitement les paramètres
-   criteria[…_from] / criteria[…_to]. Si le DTO fournit des valeurs par défaut
-   (ex. mois courant sur la timeline), le token n'apparaît pas — les inputs
-   date restent visibles avec les valeurs par défaut, mais le token n'est pas
-   rendu (pas de bouton × trompeur qui ne fait que réinitialiser aux défauts). #}
+   Le token s'affiche dès que le DTO porte des dates non vides — y compris
+   les valeurs par défaut (ex. mois courant sur la timeline). Le bouton ×
+   vide les inputs et soumet le formulaire ; le DTO reçoit alors une chaîne
+   vide (pas null) et la data source saute le prédicat date → toutes les
+   entrées sont affichées. #}
 {% set dateRangeTokenData = null %}
-{% set criteriaFromUrl = app.request.query.all.criteria ?? {} %}
 {% for filter in filters %}
     {% set filterType = filter.type.value ?? filter.type %}
     {% if filterType == 'date_range' %}
@@ -102,9 +107,7 @@
         {% set toValue = attribute(view.filter, filter.propertyName ~ 'To') ?? attribute(view.filter, filter.propertyName ~ '_to') ?? '' %}
         {% set hasFrom = fromValue is not null and fromValue != '' %}
         {% set hasTo = toValue is not null and toValue != '' %}
-        {% set urlHasFrom = (criteriaFromUrl[filter.propertyName ~ '_from'] ?? '') != '' %}
-        {% set urlHasTo = (criteriaFromUrl[filter.propertyName ~ '_to'] ?? '') != '' %}
-        {% if (hasFrom or hasTo) and (urlHasFrom or urlHasTo) %}
+        {% if hasFrom or hasTo %}
             {% set activeTokenCount = activeTokenCount + 1 %}
             {% set dateRangeTokenData = {
                 label: filter.label,
@@ -375,8 +378,6 @@
                 {% if filterType == 'date_range' %}
                     {% set fromValue = attribute(view.filter, filter.propertyName ~ 'From') ?? attribute(view.filter, filter.propertyName ~ '_from') ?? '' %}
                     {% set toValue = attribute(view.filter, filter.propertyName ~ 'To') ?? attribute(view.filter, filter.propertyName ~ '_to') ?? '' %}
-                    {% set urlHasDateFrom = (criteriaFromUrl[filter.propertyName ~ '_from'] ?? '') != '' %}
-                    {% set urlHasDateTo = (criteriaFromUrl[filter.propertyName ~ '_to'] ?? '') != '' %}
                     <div class="fb-daterange">
                         <span class="fb-daterange-label">{{ filter.label }}</span>
                         <label class="sr-only"
@@ -385,8 +386,7 @@
                         </label>
                         <input type="date"
                                id="fb-dr-{{ view.definition.name }}-{{ filter.propertyName }}-from"
-                               {% if urlHasDateFrom %}name="criteria[{{ filter.propertyName }}_from]"{% endif %}
-                               data-criteria-name="criteria[{{ filter.propertyName }}_from]"
+                               name="criteria[{{ filter.propertyName }}_from]"
                                value="{{ fromValue is not null and fromValue != '' ? fromValue|safe_date_fr('Y-m-d') : '' }}"
                                data-action="change->grid-search#dateSubmit">
                         <span class="fb-daterange-sep" aria-hidden="true">→</span>
@@ -396,8 +396,7 @@
                         </label>
                         <input type="date"
                                id="fb-dr-{{ view.definition.name }}-{{ filter.propertyName }}-to"
-                               {% if urlHasDateTo %}name="criteria[{{ filter.propertyName }}_to]"{% endif %}
-                               data-criteria-name="criteria[{{ filter.propertyName }}_to]"
+                               name="criteria[{{ filter.propertyName }}_to]"
                                value="{{ toValue is not null and toValue != '' ? toValue|safe_date_fr('Y-m-d') : '' }}"
                                data-action="change->grid-search#dateSubmit">
                     </div>

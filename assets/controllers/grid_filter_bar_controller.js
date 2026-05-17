@@ -934,16 +934,13 @@ export default class extends Controller {
             `[data-model="${property}To"], input[name="criteria[${property}_to]"]`,
         );
 
-        if (fromInput) {
-            fromInput.value = '';
-            fromInput.dispatchEvent(new Event('change', { bubbles: true }));
-        }
-        if (toInput) {
-            toInput.value = '';
-            toInput.dispatchEvent(new Event('change', { bubbles: true }));
-        }
+        if (fromInput) { fromInput.value = ''; }
+        if (toInput) { toInput.value = ''; }
 
-        if (!this.#liveMode) {
+        if (this.#liveMode) {
+            if (fromInput) { fromInput.dispatchEvent(new Event('change', { bubbles: true })); }
+            if (toInput) { toInput.dispatchEvent(new Event('change', { bubbles: true })); }
+        } else {
             const form = this.element.closest('form') ?? this.element.querySelector('form');
             if (form?.requestSubmit) {
                 form.requestSubmit();

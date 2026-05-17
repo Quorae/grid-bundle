@@ -103,12 +103,9 @@
         {% endif %}
     {% endfor %}
 
-    {# ── DateRange token résumé (read-only, dans la barre) ── #}
+    {# ── DateRange token résumé (dans la barre) ── #}
     {% if dateRangeTokenData is not null %}
         {% set isOverflow = maxVisible is not null and tokenIndex >= maxVisible %}
-        {% set drPropName = dateRangeTokenData.propertyName %}
-        {% set removedCriteria = currentCriteria|filter((v, k) => k != (drPropName ~ '_from') and k != (drPropName ~ '_to')) %}
-        {% set drRemoveUrl = path(route, routeParams|merge(queryParams|merge({ criteria: removedCriteria, (view.pageParam): 1 }))) %}
 
         <span class="fb-token fb-token--daterange{% if isOverflow %} fb-token--overflow{% endif %}"
               role="status"
@@ -121,15 +118,13 @@
             <span class="fb-token__val">{{ dateRangeTokenData.fromFormatted }}</span>
             <span class="fb-token__arrow" aria-hidden="true">→</span>
             <span class="fb-token__val">{{ dateRangeTokenData.toFormatted }}</span>
-            <a href="{{ drRemoveUrl }}"
-               class="fb-token__remove"
-               aria-label="Retirer le filtre {{ dateRangeTokenData.label }}"
-               data-turbo-frame="{{ view.frameId }}"
-               data-turbo-action="replace"
-               data-action="click->grid-filter-bar#removeToken:stop"
-               data-filter-property="{{ dateRangeTokenData.propertyName }}">
+            <button type="button"
+                    class="fb-token__remove"
+                    aria-label="Retirer le filtre {{ dateRangeTokenData.label }}"
+                    data-action="click->grid-filter-bar#clearDateRange:stop"
+                    data-date-property="{{ dateRangeTokenData.propertyName }}">
                 {{ close_icon() }}
-            </a>
+            </button>
         </span>
         {% set tokenIndex = tokenIndex + 1 %}
     {% endif %}

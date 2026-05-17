@@ -47,18 +47,8 @@ export default class extends Controller {
     dateSubmit(event) {
         this.#cancel();
         const input = event.currentTarget;
-        if (input) {
-            if (!input.name && input.dataset.criteriaName) {
-                input.name = input.dataset.criteriaName;
-            }
-            const sibling = input.closest('.fb-daterange')
-                ?.querySelector('input[type="date"]:not([name])');
-            if (sibling && sibling.dataset.criteriaName && sibling.value) {
-                sibling.name = sibling.dataset.criteriaName;
-            }
-            if (input.id) {
-                this.#rememberFocus(input);
-            }
+        if (input?.id) {
+            this.#rememberFocus(input);
         }
         this.#timer = window.setTimeout(() => this.#requestSubmit(), 800);
     }
