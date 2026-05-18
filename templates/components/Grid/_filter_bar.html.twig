@@ -136,6 +136,11 @@
     {% set placeholder = search ? (search.placeholder ?? 'Rechercher…') : 'Rechercher…' %}
 {% endif %}
 
+{# The .fb-bar (search chrome + tokens + popover) is only useful when there
+   is a search input or tokenised filters (pills/toggle). Grids with only
+   Select/DateRange filters skip the bar and render widgets directly. #}
+{% set hasBar = search is not null or prefixMap is not empty %}
+
 {# ============================================================
  # SVG icône recherche (réutilisée dans les deux modes)
  # ============================================================ #}
@@ -154,55 +159,59 @@
      # ============================================================ #}
     <div {{ stimulus_controller('grid-filter-bar', { prefixes: prefixMap, debounce: search ? search.debounceMs : 300 }) }}>
 
-        {# ── Barre principale ── #}
-        <div class="fb-bar"
-             {{ stimulus_target('grid-filter-bar', 'bar') }}>
+        {# ── Barre principale (search chrome + tokens + popover) ── #}
+        {% if hasBar %}
+            <div class="fb-bar"
+                 {{ stimulus_target('grid-filter-bar', 'bar') }}>
 
-            {{ searchIcon|raw }}
+                {{ searchIcon|raw }}
 
-            {# ── Tokens actifs ── #}
-            {% include '@QuoraeGrid/components/Grid/_filter_live.html.twig' with {
-                filters: filters,
-                view: view,
-                popoverMode: false,
-                maxVisible: maxVisible,
-                activeTokenCount: activeTokenCount,
-                dateRangeTokenData: dateRangeTokenData,
-            } only %}
+                {# ── Tokens actifs ── #}
+                {% include '@QuoraeGrid/components/Grid/_filter_live.html.twig' with {
+                    filters: filters,
+                    view: view,
+                    popoverMode: false,
+                    maxVisible: maxVisible,
+                    activeTokenCount: activeTokenCount,
+                    dateRangeTokenData: dateRangeTokenData,
+                } only %}
 
-            {# ── Input de recherche + détection préfixe ── #}
-            {% include '@QuoraeGrid/components/Grid/_search_input.html.twig' with {
-                view: view,
-                live: true,
-                fbMode: true,
-                popoverId: popoverId,
-                placeholder: search ? (search.placeholder ?? placeholder) : placeholder,
-            } only %}
+                {# ── Input de recherche + détection préfixe ── #}
+                {% if search %}
+                    {% include '@QuoraeGrid/components/Grid/_search_input.html.twig' with {
+                        view: view,
+                        live: true,
+                        fbMode: true,
+                        popoverId: popoverId,
+                        placeholder: search.placeholder ?? placeholder,
+                    } only %}
 
-            {# ── Indicateur raccourci / ── #}
-            <span class="fb-cmd-hint" aria-hidden="true">/</span>
+                    {# ── Indicateur raccourci / ── #}
+                    <span class="fb-cmd-hint" aria-hidden="true">/</span>
+                {% endif %}
 
-            {# ── Bouton Tout effacer ── #}
-            {% if activeFilterCount > 0 %}
-                <div class="fb-end">
-                    <button type="button"
-                            class="fb-clear"
-                            data-action="live#action:prevent"
-                            data-live-action-param="clearFilters">
-                        Tout effacer
-                    </button>
-                </div>
-            {% endif %}
+                {# ── Bouton Tout effacer ── #}
+                {% if activeFilterCount > 0 %}
+                    <div class="fb-end">
+                        <button type="button"
+                                class="fb-clear"
+                                data-action="live#action:prevent"
+                                data-live-action-param="clearFilters">
+                            Tout effacer
+                        </button>
+                    </div>
+                {% endif %}
 
-            {# ── Popover de suggestions ── #}
-            {% include '@QuoraeGrid/components/Grid/_filter_live.html.twig' with {
-                filters: filters,
-                view: view,
-                popoverMode: true,
-                popoverId: popoverId,
-                prefixMap: prefixMap,
-            } only %}
-        </div>
+                {# ── Popover de suggestions ── #}
+                {% include '@QuoraeGrid/components/Grid/_filter_live.html.twig' with {
+                    filters: filters,
+                    view: view,
+                    popoverMode: true,
+                    popoverId: popoverId,
+                    prefixMap: prefixMap,
+                } only %}
+            </div>
+        {% endif %}
 
         {# ── Filtres visibles : Select dropdowns + DateRange ── #}
         <div class="fb-filters">
@@ -287,72 +296,76 @@
             {% endif %}
         {% endfor %}
 
-        {# ── Barre principale ── #}
-        <div class="fb-bar"
-             {{ stimulus_target('grid-filter-bar', 'bar') }}>
+        {# ── Barre principale (search chrome + tokens + popover) ── #}
+        {% if hasBar %}
+            <div class="fb-bar"
+                 {{ stimulus_target('grid-filter-bar', 'bar') }}>
 
-            {{ searchIcon|raw }}
+                {{ searchIcon|raw }}
 
-            {# ── Tokens actifs ── #}
-            {% include '@QuoraeGrid/components/Grid/_filter_turbo.html.twig' with {
-                filters: filters,
-                view: view,
-                popoverMode: false,
-                maxVisible: maxVisible,
-                activeTokenCount: activeTokenCount,
-                dateRangeTokenData: dateRangeTokenData,
-            } only %}
+                {# ── Tokens actifs ── #}
+                {% include '@QuoraeGrid/components/Grid/_filter_turbo.html.twig' with {
+                    filters: filters,
+                    view: view,
+                    popoverMode: false,
+                    maxVisible: maxVisible,
+                    activeTokenCount: activeTokenCount,
+                    dateRangeTokenData: dateRangeTokenData,
+                } only %}
 
-            {# ── Input de recherche + détection préfixe ── #}
-            {% include '@QuoraeGrid/components/Grid/_search_input.html.twig' with {
-                view: view,
-                live: false,
-                fbMode: true,
-                popoverId: popoverId,
-                placeholder: search ? (search.placeholder ?? placeholder) : placeholder,
-            } only %}
+                {# ── Input de recherche + détection préfixe ── #}
+                {% if search %}
+                    {% include '@QuoraeGrid/components/Grid/_search_input.html.twig' with {
+                        view: view,
+                        live: false,
+                        fbMode: true,
+                        popoverId: popoverId,
+                        placeholder: search.placeholder ?? placeholder,
+                    } only %}
 
-            {# ── Indicateur raccourci / ── #}
-            <span class="fb-cmd-hint" aria-hidden="true">/</span>
+                    {# ── Indicateur raccourci / ── #}
+                    <span class="fb-cmd-hint" aria-hidden="true">/</span>
+                {% endif %}
 
-            {# ── Bouton Tout effacer (Turbo : navigue vers l'URL sans critères) ── #}
-            {% if activeFilterCount > 0 %}
-                {% set clearUrl = path(
-                    app.request.attributes.get('_route'),
-                    app.request.attributes.get('_route_params') ?? {}
-                ) %}
-                {# Préserver les params non-Grid dans l'URL de reset #}
-                {% set clearParams = {} %}
-                {% for key, value in app.request.query.all %}
-                    {% if key not in ['q', 'criteria', 'p', 'sort'] %}
-                        {% set clearParams = clearParams|merge({ (key): value }) %}
-                    {% endif %}
-                {% endfor %}
-                {% if clearParams|length > 0 %}
+                {# ── Bouton Tout effacer (Turbo : navigue vers l'URL sans critères) ── #}
+                {% if activeFilterCount > 0 %}
                     {% set clearUrl = path(
                         app.request.attributes.get('_route'),
-                        (app.request.attributes.get('_route_params') ?? {})|merge(clearParams)
+                        app.request.attributes.get('_route_params') ?? {}
                     ) %}
+                    {# Préserver les params non-Grid dans l'URL de reset #}
+                    {% set clearParams = {} %}
+                    {% for key, value in app.request.query.all %}
+                        {% if key not in ['q', 'criteria', 'p', 'sort'] %}
+                            {% set clearParams = clearParams|merge({ (key): value }) %}
+                        {% endif %}
+                    {% endfor %}
+                    {% if clearParams|length > 0 %}
+                        {% set clearUrl = path(
+                            app.request.attributes.get('_route'),
+                            (app.request.attributes.get('_route_params') ?? {})|merge(clearParams)
+                        ) %}
+                    {% endif %}
+                    <div class="fb-end">
+                        <a href="{{ clearUrl }}"
+                           class="fb-clear"
+                           data-turbo-frame="{{ view.frameId }}"
+                           data-turbo-action="replace">
+                            Tout effacer
+                        </a>
+                    </div>
                 {% endif %}
-                <div class="fb-end">
-                    <a href="{{ clearUrl }}"
-                       class="fb-clear"
-                       data-turbo-frame="{{ view.frameId }}"
-                       data-turbo-action="replace">
-                        Tout effacer
-                    </a>
-                </div>
-            {% endif %}
 
-            {# ── Popover de suggestions ── #}
-            {% include '@QuoraeGrid/components/Grid/_filter_turbo.html.twig' with {
-                filters: filters,
-                view: view,
-                popoverMode: true,
-                popoverId: popoverId,
-                prefixMap: prefixMap,
-            } only %}
-        </div>
+                {# ── Popover de suggestions ── #}
+                {% include '@QuoraeGrid/components/Grid/_filter_turbo.html.twig' with {
+                    filters: filters,
+                    view: view,
+                    popoverMode: true,
+                    popoverId: popoverId,
+                    prefixMap: prefixMap,
+                } only %}
+            </div>
+        {% endif %}
 
         {# ── Filtres visibles : Select dropdowns + DateRange ── #}
         <div class="fb-filters">
