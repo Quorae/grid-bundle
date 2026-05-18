@@ -50,6 +50,9 @@ export default class extends Controller {
     /** @type {((e: KeyboardEvent) => void)|null} */
     #globalKeyHandler = null;
 
+    /** @type {Object<string, {label?: string, type?: string, choices?: Object, active?: boolean}>} */
+    #prefixes = {};
+
     // ─── Lifecycle ────────────────────────────────────────────────────────────
 
     connect() {
@@ -57,6 +60,12 @@ export default class extends Controller {
         this.#gridName = this.hasPopoverTarget
             ? this.popoverTarget.id.replace('fb-pop-', '')
             : '';
+        try {
+            const raw = this.prefixesValue;
+            this.#prefixes = (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : {};
+        } catch {
+            this.#prefixes = {};
+        }
         this.#syncAria(this.openValue);
 
         this.#globalKeyHandler = this.#handleGlobalKey.bind(this);
@@ -258,6 +267,8 @@ export default class extends Controller {
             this.barTarget.classList.add('fb-bar--focus');
         }
 
+        // Pre-render suggestions so ArrowDown can highlight immediately,
+        // but do NOT open the popover — let onInput or ArrowDown handle that.
         if (this.#currentKey !== null) {
             const value = this.hasInputTarget ? this.inputTarget.value : '';
             this.#renderSuggestions(this.#currentKey, `${this.#currentKey}:${value}`);
@@ -269,18 +280,10 @@ export default class extends Controller {
                 this.#renderSuggestions(prefix, value);
             } else if (value.trim() !== '') {
                 const matches = this.#matchByLabel(value.trim());
-                this.#renderKeyList(matches.length > 0 ? matches : Object.entries(this.prefixesValue));
+                this.#renderKeyList(matches.length > 0 ? matches : Object.entries(this.#prefixes));
             } else {
                 this.#renderAllFilters();
             }
-        }
-
-        if (this.#currentMode === 'closed') {
-            this.#transition('keys');
-            const count = this.suggestionTargets.length;
-            this.#announce(`Filtres, ${count} option${count > 1 ? 's' : ''}`);
-        } else {
-            this.openValue = true;
         }
     }
 
@@ -408,7 +411,7 @@ export default class extends Controller {
             }
             this.#renderSuggestions(property, `${property}:`);
             const count = this.suggestionTargets.length;
-            this.#announce(`${this.prefixesValue[property]?.label ?? property}, ${count} valeur${count > 1 ? 's' : ''}`);
+            this.#announce(`${this.#prefixes[property]?.label ?? property}, ${count} valeur${count > 1 ? 's' : ''}`);
             return;
         }
 
@@ -427,7 +430,7 @@ export default class extends Controller {
         this.#refocusInput();
 
         // Announce the applied filter
-        const filterLabel = this.prefixesValue[property]?.label ?? property;
+        const filterLabel = this.#prefixes[property]?.label ?? property;
         let announcement = `Filtre ${filterLabel} appliqué`;
 
         if (this.#liveMode) {
@@ -471,7 +474,7 @@ export default class extends Controller {
             return;
         }
 
-        const filterLabel = this.prefixesValue[property]?.label ?? property;
+        const filterLabel = this.#prefixes[property]?.label ?? property;
 
         this.dispatch('token-remove', {
             detail: { property },
@@ -495,7 +498,7 @@ export default class extends Controller {
             return null;
         }
 
-        for (const [key, def] of Object.entries(this.prefixesValue)) {
+        for (const [key, def] of Object.entries(this.#prefixes)) {
             const labelNorm = this.#normalize(def.label ?? key);
             if (labelNorm.startsWith(typed) || this.#normalize(key).startsWith(typed)) {
                 return key;
@@ -516,7 +519,7 @@ export default class extends Controller {
         const norm = this.#normalize(query);
         const results = [];
 
-        for (const [key, def] of Object.entries(this.prefixesValue)) {
+        for (const [key, def] of Object.entries(this.#prefixes)) {
             const labelNorm = this.#normalize(def.label ?? key);
             const keyNorm = this.#normalize(key);
 
@@ -534,7 +537,7 @@ export default class extends Controller {
      */
     #countActiveFilters() {
         let count = 0;
-        for (const def of Object.values(this.prefixesValue)) {
+        for (const def of Object.values(this.#prefixes)) {
             if (def.type === 'toggle') {
                 if (def.active === true) {
                     count++;
@@ -569,7 +572,7 @@ export default class extends Controller {
      */
     #enterValueMode(key) {
         this.#transition('values', key);
-        const def = this.prefixesValue[key];
+        const def = this.#prefixes[key];
         if (this.hasPrefixTarget && def) {
             this.prefixTarget.textContent = `${def.label ?? key} : `;
         }
@@ -614,7 +617,7 @@ export default class extends Controller {
     // ─── Popover rendering ────────────────────────────────────────────────────
 
     #renderAllFilters() {
-        this.#renderKeyList(Object.entries(this.prefixesValue));
+        this.#renderKeyList(Object.entries(this.#prefixes));
     }
 
     #renderSuggestions(prefix, rawInput) {
@@ -622,7 +625,7 @@ export default class extends Controller {
             return;
         }
 
-        const def = this.prefixesValue[prefix];
+        const def = this.#prefixes[prefix];
         if (!def) {
             return;
         }
@@ -806,7 +809,7 @@ export default class extends Controller {
      * @returns {HTMLElement}
      */
     #makeSuggestionEl(property, value, label, filterLabel) {
-        const def = this.prefixesValue[property];
+        const def = this.#prefixes[property];
         const el = document.createElement('div');
         el.className = 'fb-pop-item';
         el.setAttribute('role', 'option');
