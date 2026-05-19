@@ -234,7 +234,9 @@ export default class extends Controller {
             this.#currentKey = null;
             this.#currentMode = 'keys';
             this.#renderAllFilters();
-            this.openValue = true;
+            // Don't open popover on empty input — avoids a flash of empty
+            // container during Turbo frame swap. ArrowDown still opens it
+            // (checks !this.openValue). onFocus pre-renders for instant open.
             if (this.#liveMode) {
                 this.#syncSearchModel();
             }

@@ -95,6 +95,7 @@ export default class extends Controller {
             window.sessionStorage.setItem(FOCUS_STORAGE_KEY, JSON.stringify({
                 id: input.id,
                 cursor: input.selectionEnd ?? input.value.length,
+                value: input.value,
             }));
         } catch (_) {
             // sessionStorage can be blocked — no-op, graceful degradation.
@@ -123,12 +124,26 @@ export default class extends Controller {
             if (!input.isConnected) {
                 return;
             }
+
+            // Restore typed-ahead value lost during Turbo frame swap:
+            // characters entered between debounce fire and response arrival
+            // are overwritten by the server-rendered value attribute.
+            const valueChanged = snapshot.value !== undefined && snapshot.value !== input.value;
+            if (valueChanged) {
+                input.value = snapshot.value;
+            }
+
             input.focus();
             const end = typeof snapshot.cursor === 'number' ? snapshot.cursor : input.value.length;
             try {
                 input.setSelectionRange(end, end);
             } catch (_) {
                 // Some input types (type=date) don't support selectionRange.
+            }
+
+            if (valueChanged) {
+                this.#cancel();
+                this.#timer = window.setTimeout(() => this.#requestSubmit(), this.debounceValue);
             }
         });
     }
