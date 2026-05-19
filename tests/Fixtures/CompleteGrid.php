@@ -45,7 +45,7 @@ final class CompleteGrid
     #[Column(
         label: 'Solde',
         class: 'num',
-        formatter: Formatter::MontantFr,
+        formatter: Formatter::Badge,
         hideOnMobile: true,
     )]
     public string $solde;

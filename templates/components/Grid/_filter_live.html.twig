@@ -49,7 +49,6 @@
         {% set filterType = filter.type.value ?? filter.type %}
         {% set rawCurrent = attribute(view.filter, filter.propertyName) %}
         {% set current = rawCurrent is not null and rawCurrent.value is defined ? rawCurrent.value : rawCurrent %}
-        {% set current = current|enum_value %}
         {% set normalizedCurrent = current is same as(false) ? '0' : current %}
         {% set hasValue = current is same as(false) or (current is not null and current != '') %}
 

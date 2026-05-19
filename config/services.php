@@ -18,7 +18,6 @@ use Quorae\GridBundle\Registry\OwnershipValidatorRegistry;
 use Quorae\GridBundle\Twig\Components\Grid;
 use Quorae\GridBundle\Twig\Components\LiveGrid;
 use Quorae\GridBundle\Twig\GridExtension;
-use Quorae\GridBundle\Twig\GridFormattingExtension;
 
 use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\tagged_locator;
@@ -71,12 +70,6 @@ return static function (ContainerConfigurator $c): void {
 
     // Twig extension — grid_row_classes (RowSignature).
     $services->set(GridExtension::class)->tag('twig.extension');
-
-    // Twig extension — montant_fr / enum_value, consumed by the bundle's cell
-    // partials and filter-bar partials so the framework is standalone (port-map
-    // §3.5 delta D2 — ported verbatim from AICD AccountingExtension /
-    // BackedEnumExtension).
-    $services->set(GridFormattingExtension::class)->tag('twig.extension');
 
     // Twig components (UX) — twig.component tags added by autoconfigure when
     // ux-twig-component / ux-live-component are present in the host.

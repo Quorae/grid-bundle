@@ -5,16 +5,15 @@ declare(strict_types=1);
 namespace Quorae\GridBundle\Enum;
 
 /**
- * Rendering strategy applied to a column cell.
+ * Built-in rendering strategies for column cells.
  *
- * Every case maps to a Twig partial under `templates/components/Grid/cell/`
- * (rendered by the `Grid` Twig component layer — not this backend module).
+ * Every case maps to a Twig partial under `templates/components/Grid/cell/`.
+ * Domain-specific formatters (money, locale dates…) should use `Twig` with
+ * a host-project template — the bundle stays locale/domain neutral.
  */
 enum Formatter: string
 {
     case Plain = 'plain';
-    case MontantFr = 'montant_fr';
-    case DateFr = 'date_fr';
     case Chip = 'chip';
     case Badge = 'badge';
     case Twig = 'twig';

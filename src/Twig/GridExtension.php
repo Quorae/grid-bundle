@@ -8,22 +8,25 @@ use Quorae\GridBundle\Definition\GridDefinition;
 use Quorae\GridBundle\Definition\RowSignatureDefinition;
 use Quorae\GridBundle\Enum\LedgerSignature;
 use Twig\Extension\AbstractExtension;
+use Twig\TwigFilter;
 use Twig\TwigFunction;
 
 /**
  * Twig extension backing the grid framework's rendering concerns.
  *
- * `grid_row_classes(row, definition)` invokes every `#[RowSignature]`
- * static predicate declared on the grid class, collects the Ledger
- * signatures that apply to the current row, and returns the concatenated
- * CSS classes — `"anomaly"` / `"total"` / `"subtotal"`.
+ * Functions:
+ *   `grid_row_classes(row, definition)` — evaluates `#[RowSignature]`
+ *   predicates and returns concatenated CSS classes.
  *
- * The grid's row objects never need to expose a `ledgerSignatures()`
- * method : the framework reads the predicates straight from the grid
- * definition. Keeps row DTOs free of presentation concerns.
+ * Filters:
+ *   `grid_safe_date(value, format)` — safe date formatting for DateRange
+ *   filter chips. Degrades gracefully on unparseable strings instead of
+ *   throwing DateMalformedStringException.
  */
 final class GridExtension extends AbstractExtension
 {
+    private const string DATE_PLACEHOLDER = '…';
+
     /**
      * @return list<TwigFunction>
      */
@@ -32,6 +35,33 @@ final class GridExtension extends AbstractExtension
         return [
             new TwigFunction('grid_row_classes', $this->rowClasses(...)),
         ];
+    }
+
+    /**
+     * @return list<TwigFilter>
+     */
+    public function getFilters(): array
+    {
+        return [
+            new TwigFilter('grid_safe_date', $this->gridSafeDate(...)),
+        ];
+    }
+
+    public function gridSafeDate(\DateTimeInterface|string|null $value, string $format): string
+    {
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format($format);
+        }
+
+        if ($value === null || $value === '') {
+            return self::DATE_PLACEHOLDER;
+        }
+
+        try {
+            return (new \DateTimeImmutable($value))->format($format);
+        } catch (\Exception) {
+            return $value;
+        }
     }
 
     public function rowClasses(object $row, GridDefinition $definition): string

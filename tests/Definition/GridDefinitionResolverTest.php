@@ -78,7 +78,7 @@ final class GridDefinitionResolverTest extends TestCase
         self::assertSame('lbl', $definition->columns[1]->class);
 
         self::assertSame('solde', $definition->columns[2]->propertyName);
-        self::assertSame(Formatter::MontantFr, $definition->columns[2]->formatter);
+        self::assertSame(Formatter::Badge, $definition->columns[2]->formatter);
         self::assertTrue($definition->columns[2]->hideOnMobile);
     }
 

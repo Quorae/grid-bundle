@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Quorae\GridBundle\Tests\Twig;
 
-use Quorae\GridBundle\Twig\GridFormattingExtension;
+use Quorae\GridBundle\Twig\GridExtension;
 use PHPUnit\Framework\TestCase;
 use Twig\Environment;
 use Twig\Error\RuntimeError;
@@ -21,7 +21,7 @@ use Twig\Loader\ArrayLoader;
  * value (`notadate`, `2026-13-99`, …) raised `DateMalformedStringException`
  * → Twig `RuntimeError` → HTTP 500 on all 4 DateRange grids.
  *
- * These tests assert the post-fix `|safe_date_fr()` pipeline degrades
+ * These tests assert the post-fix `|grid_safe_date()` pipeline degrades
  * gracefully (no exception, raw string rendered) while valid dates still
  * format and a still-valid sibling bound is unaffected.
  */
@@ -33,14 +33,14 @@ final class FilterBarDateRangeRenderTest extends TestCase
     {
         $this->twig = new Environment(new ArrayLoader([
             // Faithful copy of the _filter_bar.html.twig chip expression.
-            'chip' => "{{ hasFrom ? fromValue|safe_date_fr('d/m') : '…' }}"
+            'chip' => "{{ hasFrom ? fromValue|grid_safe_date('d/m') : '…' }}"
                 .'|'
-                ."{{ hasTo ? toValue|safe_date_fr('d/m') : '…' }}",
+                ."{{ hasTo ? toValue|grid_safe_date('d/m') : '…' }}",
             // The native |date() the template used pre-fix — kept to prove
             // the regression really existed for the right reason.
             'legacy' => "{{ fromValue|date('d/m') }}",
         ]));
-        $this->twig->addExtension(new GridFormattingExtension());
+        $this->twig->addExtension(new GridExtension());
     }
 
     public function testNativeDateFilterStillThrowsOnMalformedStringProvingTheRegression(): void
