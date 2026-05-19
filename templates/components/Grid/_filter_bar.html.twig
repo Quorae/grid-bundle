@@ -157,7 +157,9 @@
     {# ============================================================
      # Mode Live Component
      # ============================================================ #}
-    <div {{ stimulus_controller('grid-filter-bar', { prefixes: prefixMap, debounce: search ? search.debounceMs : 300 }) }}>
+    {% set fbArgs = { debounce: search ? search.debounceMs : 300 } %}
+    {% if prefixMap is not empty %}{% set fbArgs = fbArgs|merge({ prefixes: prefixMap }) %}{% endif %}
+    <div {{ stimulus_controller('grid-filter-bar', fbArgs) }}>
 
         {# ── Barre principale (search chrome + tokens + popover) ── #}
         {% if hasBar %}
@@ -278,7 +280,9 @@
           data-turbo-frame="{{ view.frameId }}"
           data-turbo-action="replace"
           {{ stimulus_action('grid-search', 'submit', 'grid-filter-bar:selected') }}
-          {{ stimulus_controller('grid-search', { debounce: search ? search.debounceMs : 300 })|stimulus_controller('grid-filter-bar', { prefixes: prefixMap }) }}>
+          {% set fbArgs = { debounce: search ? search.debounceMs : 300 } %}
+          {% if prefixMap is not empty %}{% set fbArgs = fbArgs|merge({ prefixes: prefixMap }) %}{% endif %}
+          {{ stimulus_controller('grid-search', { debounce: search ? search.debounceMs : 300 })|stimulus_controller('grid-filter-bar', fbArgs) }}>
 
         {# Conserver la navigation interne : tous les params de l'URL qui ne
            sont pas gérés par le framework (q / criteria / page / sort) sont
