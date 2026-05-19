@@ -12,6 +12,7 @@ use Quorae\GridBundle\Exception\BulkActionException;
 use Quorae\GridBundle\Handler\BulkActionExecutor;
 use Quorae\GridBundle\Handler\PageParser;
 use Quorae\GridBundle\Handler\RenderGridHandler;
+use Quorae\GridBundle\Registry\GridRegistry;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -43,9 +44,11 @@ use Symfony\UX\TwigComponent\Attribute\ExposeInTemplate;
  *  - surfaces a flash summary through `$flashMessage` / `$flashType` and
  *    wipes the selection on success.
  *
- * Navigation mutations (page / search / filter / sort) reset `$selectedIds`
- * and `$expandedRowId` through the `onUpdated: 'resetSelectionOnNavigation'`
- * hook on each writable prop — stale state never leaks across pages.
+ * Navigation mutations reset `$selectedIds` and `$expandedRowId` through
+ * per-prop `onUpdated` hooks — stale state never leaks across pages. A
+ * filter/search/sort change additionally restarts pagination at page 1
+ * ({@see self::onFilterChanged()}); a `$page` change keeps the page
+ * ({@see self::resetSelectionOnNavigation()}).
  *
  * Template path : `@QuoraeGrid/components/Grid/live_grid.html.twig`.
  */
@@ -57,17 +60,17 @@ final class LiveGrid
     #[LiveProp]
     public string $gridName = '';
 
-    #[LiveProp(writable: true, url: true, onUpdated: 'resetSelectionOnNavigation')]
+    #[LiveProp(writable: true, url: true, onUpdated: 'onFilterChanged')]
     public ?string $q = null;
 
     /** @var array<string, mixed> */
-    #[LiveProp(writable: true, url: true, onUpdated: 'resetSelectionOnNavigation')]
+    #[LiveProp(writable: true, url: true, onUpdated: 'onFilterChanged')]
     public array $criteria = [];
 
     #[LiveProp(writable: true, url: new UrlMapping(as: PageParser::PAGE_PARAM), onUpdated: 'resetSelectionOnNavigation')]
     public int $page = 1;
 
-    #[LiveProp(writable: true, url: true, onUpdated: 'resetSelectionOnNavigation')]
+    #[LiveProp(writable: true, url: true, onUpdated: 'onFilterChanged')]
     public ?string $sort = null;
 
     /** @var array<string, mixed> */
@@ -96,6 +99,7 @@ final class LiveGrid
         private readonly RequestStack $requestStack,
         private readonly Security $security,
         private readonly BulkActionExecutor $bulkActionExecutor,
+        private readonly GridRegistry $grids,
     ) {
     }
 
@@ -106,6 +110,7 @@ final class LiveGrid
     {
         $this->gridName = $gridName;
         $this->extraContext = $extraContext;
+        $this->criteria = LiveGridCriteria::seed($this->criteria, $this->grids->get($gridName));
     }
 
     /**
@@ -208,12 +213,25 @@ final class LiveGrid
     }
 
     /**
-     * Hook invoked by Live Component when a navigation `LiveProp` (page /
-     * search / filter / sort) changes — drops the current selection and
-     * expanded row so stale state never leaks across contexts.
+     * Hook invoked by Live Component when `$page` changes — drops the current
+     * selection and expanded row so stale state never leaks across pages.
+     * Must NOT touch `$page` itself (it would defeat pagination).
      */
     public function resetSelectionOnNavigation(): void
     {
+        $this->resetNavigationState();
+    }
+
+    /**
+     * Hook invoked when `$q` / `$criteria` / `$sort` change via a raw
+     * `data-model` write (search box, Select, DateRange). Any of these is a
+     * fresh query, so pagination must restart at page 1 — mirroring the
+     * setFilter / clearFilters / sort Live actions, which a `data-model`
+     * write bypasses.
+     */
+    public function onFilterChanged(): void
+    {
+        $this->page = 1;
         $this->resetNavigationState();
     }
 
