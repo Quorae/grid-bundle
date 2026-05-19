@@ -3,7 +3,7 @@
     "type": "symfony-bundle",
     "description": "Declarative attribute-driven listing/search/filter/sort/pagination framework for Symfony 7+ (Turbo Frame + Live Component dual mode).",
     "license": "MIT",
-    "keywords": ["symfony", "grid", "listing", "datatable", "live-component", "turbo"],
+    "keywords": ["symfony", "symfony-ux", "grid", "listing", "datatable", "live-component", "turbo"],
     "authors": [{ "name": "Tristan Florin", "email": "tristan.florin@gmail.com" }],
     "require": {
         "php": ">=8.3",
