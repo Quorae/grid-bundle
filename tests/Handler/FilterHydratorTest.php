@@ -199,6 +199,78 @@ final class FilterHydratorTest extends TestCase
         self::assertSame(4, $filter->classe);
     }
 
+    public function testEmptyStringOnNullableStringBecomesNull(): void
+    {
+        $definition = $this->buildDefinition();
+        $request = Request::create('/', 'GET', ['criteria' => ['status' => '']]);
+
+        $filter = $this->hydrator->hydrate($definition, $request);
+
+        self::assertInstanceOf(DummyFilter::class, $filter);
+        self::assertNull($filter->status);
+    }
+
+    public function testEmptyStringOnSearchQIsPreserved(): void
+    {
+        $definition = $this->buildDefinition();
+        $request = Request::create('/', 'GET', ['q' => '']);
+
+        $filter = $this->hydrator->hydrate($definition, $request);
+
+        self::assertInstanceOf(DummyFilter::class, $filter);
+        self::assertSame('', $filter->q);
+    }
+
+    public function testLeadingZeroIntCoercion(): void
+    {
+        $definition = $this->buildDefinition();
+        $request = Request::create('/', 'GET', ['criteria' => ['classe' => '07']]);
+
+        $filter = $this->hydrator->hydrate($definition, $request);
+
+        self::assertInstanceOf(DummyFilter::class, $filter);
+        self::assertSame(7, $filter->classe);
+    }
+
+    public function testDecimalIntCoercion(): void
+    {
+        $definition = $this->buildDefinition();
+        $request = Request::create('/', 'GET', ['criteria' => ['clientId' => '7.0']]);
+
+        $filter = $this->hydrator->hydrate($definition, $request);
+
+        self::assertInstanceOf(DummyFilter::class, $filter);
+        self::assertSame(7, $filter->clientId);
+    }
+
+    public function testSnakeToCamelBridge(): void
+    {
+        $definition = $this->buildCamelCaseDefinition();
+        $request = Request::create('/', 'GET', [
+            'criteria' => ['client_name' => 'ACME'],
+        ]);
+
+        $filter = $this->hydrator->hydrate($definition, $request);
+
+        self::assertInstanceOf(CamelCaseFilter::class, $filter);
+        self::assertSame('ACME', $filter->clientName);
+    }
+
+    public function testSafeDefaultsPreserveValidArguments(): void
+    {
+        $definition = $this->buildDefinition();
+        $request = Request::create('/', 'GET', [
+            'q' => 'search',
+            'criteria' => ['classe' => '4', 'status' => 'invalid_enum'],
+        ]);
+
+        $filter = $this->hydrator->hydrate($definition, $request);
+
+        self::assertInstanceOf(DummyFilter::class, $filter);
+        self::assertSame('search', $filter->q);
+        self::assertSame(4, $filter->classe);
+    }
+
     public function testUnrelatedParamsStayAtDefaultWhenOnlySnakeKeyProvided(): void
     {
         $definition = $this->buildCamelCaseDefinition();

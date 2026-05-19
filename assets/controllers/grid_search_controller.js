@@ -10,11 +10,11 @@ import { Controller } from '@hotwired/stimulus';
  * réactualise alors le contenu sans full reload.
  *
  * Trois modes de déclenchement :
- *   - `input` (recherche textuelle) : debounced, on respecte le temps de frappe.
- *   - `change` (pills / select / toggle) : submit immédiat —
+ *   - `debouncedSubmit` (recherche textuelle) : debounced, on respecte le temps de frappe.
+ *   - `submit` (pills / select / toggle) : submit immédiat —
  *     l'utilisateur a fait un choix final.
- *   - `dateSubmit` (daterange inputs) : debounced (800ms) — les inputs
- *     type=date natifs fire `change` sur chaque segment (jour/mois/année),
+ *   - `dateSubmit` (daterange inputs) : debounced (800ms), gate on validity —
+ *     les inputs type=date natifs fire `change` sur chaque segment (jour/mois/année),
  *     un submit immédiat interrompt la saisie et tronque l'année.
  *
  * Préservation du focus : quand Turbo remplace le frame après submit, les
@@ -26,7 +26,7 @@ import { Controller } from '@hotwired/stimulus';
  *   - `debounce` (Number, default 300) : délai en ms avant submit sur frappe.
  *
  * Targets :
- *   - `input` : champ de recherche texte (déclenche `debouncedSubmit` sur `input`).
+ *   - `input` : champ de recherche texte (focus restoration on frame swap).
  */
 const FOCUS_STORAGE_KEY = 'grid-search:focus';
 
@@ -34,8 +34,11 @@ export default class extends Controller {
     static targets = ['input'];
     static values = { debounce: { type: Number, default: 300 } };
 
-    debouncedSubmit() {
+    debouncedSubmit(event) {
         this.#cancel();
+        if (event?.currentTarget?.id) {
+            this.#rememberFocus(event.currentTarget);
+        }
         this.#timer = window.setTimeout(() => this.#requestSubmit(), this.debounceValue);
     }
 
@@ -47,6 +50,11 @@ export default class extends Controller {
     dateSubmit(event) {
         this.#cancel();
         const input = event.currentTarget;
+
+        if (input instanceof HTMLInputElement && input.value !== '' && !input.validity.valid) {
+            return;
+        }
+
         if (input?.id) {
             this.#rememberFocus(input);
         }
@@ -54,22 +62,12 @@ export default class extends Controller {
     }
 
     inputTargetConnected(input) {
-        input.addEventListener('input', this.#onInput);
         this.#restoreFocus(input);
-    }
-
-    inputTargetDisconnected(input) {
-        input.removeEventListener('input', this.#onInput);
     }
 
     disconnect() {
         this.#cancel();
     }
-
-    #onInput = (event) => {
-        this.#rememberFocus(event.currentTarget);
-        this.debouncedSubmit();
-    };
 
     #requestSubmit() {
         const form = this.element.tagName === 'FORM' ? this.element : this.element.closest('form');

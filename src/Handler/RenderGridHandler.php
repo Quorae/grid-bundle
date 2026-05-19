@@ -103,7 +103,21 @@ final class RenderGridHandler
             sort: $page->sort,
         );
 
-        return $dataSource->fetch($filter, $clampedPage);
+        $clampedResponse = $dataSource->fetch($filter, $clampedPage);
+
+        if ($clampedResponse->page !== $lastPage) {
+            return new GridResponse(
+                rows: $clampedResponse->rows,
+                hasNext: $clampedResponse->hasNext,
+                hasPrev: $clampedResponse->hasPrev,
+                page: $lastPage,
+                groupCounts: $clampedResponse->groupCounts,
+                totalCount: $clampedResponse->totalCount,
+                totalPages: $clampedResponse->totalPages,
+            );
+        }
+
+        return $clampedResponse;
     }
 
     private function resolveDataSource(GridDefinition $definition): GridDataSource

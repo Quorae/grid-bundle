@@ -931,10 +931,10 @@ export default class extends Controller {
         }
 
         const fromInput = this.element.querySelector(
-            `[data-model="${property}From"], input[name="criteria[${property}_from]"]`,
+            `[data-model="criteria[${property}_from]"], input[name="criteria[${property}_from]"]`,
         );
         const toInput = this.element.querySelector(
-            `[data-model="${property}To"], input[name="criteria[${property}_to]"]`,
+            `[data-model="criteria[${property}_to]"], input[name="criteria[${property}_to]"]`,
         );
 
         if (fromInput) { fromInput.value = ''; }

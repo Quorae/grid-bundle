@@ -71,6 +71,7 @@ final readonly class FilterHydrator
                 constructor: $constructor,
                 filterReflection: $filterReflection,
                 extraContext: $extraContext,
+                computedArguments: $arguments,
             );
         }
     }
@@ -78,11 +79,13 @@ final readonly class FilterHydrator
     /**
      * @param \ReflectionClass<object> $filterReflection
      * @param array<string, mixed>     $extraContext
+     * @param array<string, mixed>     $computedArguments pre-computed values from the first hydration pass
      */
     private function instantiateWithSafeDefaults(
         \ReflectionMethod $constructor,
         \ReflectionClass $filterReflection,
         array $extraContext,
+        array $computedArguments = [],
     ): object {
         $arguments = [];
         foreach ($constructor->getParameters() as $parameter) {
@@ -99,10 +102,28 @@ final readonly class FilterHydrator
                 $arguments[$name] = $extraContext[$name];
                 continue;
             }
+            if (\array_key_exists($name, $computedArguments)) {
+                $arguments[$name] = $computedArguments[$name];
+                continue;
+            }
             $arguments[$name] = $this->defaultFor($parameter);
         }
 
-        return $filterReflection->newInstanceArgs($arguments);
+        try {
+            return $filterReflection->newInstanceArgs($arguments);
+        } catch (\InvalidArgumentException|\ValueError|\TypeError) {
+            $fallback = [];
+            foreach ($constructor->getParameters() as $parameter) {
+                $name = $parameter->getName();
+                if (\array_key_exists($name, $extraContext)) {
+                    $fallback[$name] = $arguments[$name];
+                    continue;
+                }
+                $fallback[$name] = $this->defaultFor($parameter);
+            }
+
+            return $filterReflection->newInstanceArgs($fallback);
+        }
     }
 
     /**
@@ -170,6 +191,11 @@ final readonly class FilterHydrator
         }
 
         $coerced = $this->coercer->coerce($rawValue, $type);
+
+        if ($coerced === '' && $type->getName() === 'string' && $type->allowsNull() && $name !== 'q') {
+            return null;
+        }
+
         if ($coerced === null && !$type->allowsNull()) {
             return $this->defaultFor($parameter);
         }
@@ -199,6 +225,11 @@ final readonly class FilterHydrator
             return $snakeName;
         }
 
+        $camelName = $this->snakeToCamel($parameterName);
+        if ($camelName !== $parameterName && \array_key_exists($camelName, $raw)) {
+            return $camelName;
+        }
+
         return null;
     }
 
@@ -207,6 +238,15 @@ final readonly class FilterHydrator
         $snake = (string) preg_replace('/[A-Z]/', '_$0', $value);
 
         return strtolower($snake);
+    }
+
+    private function snakeToCamel(string $value): string
+    {
+        if (!str_contains($value, '_')) {
+            return $value;
+        }
+
+        return lcfirst(str_replace('_', '', ucwords($value, '_')));
     }
 
     private function defaultFor(\ReflectionParameter $parameter): mixed

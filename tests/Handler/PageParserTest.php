@@ -114,6 +114,76 @@ final class PageParserTest extends TestCase
         self::assertSame('asc', $page->sort->direction);
     }
 
+    public function testRejectsSortByPropertyNameWhenSortableKeyDiffers(): void
+    {
+        $definition = new GridDefinition(
+            name: 'test_alias',
+            dataSource: InMemoryDataSource::class,
+            filterClass: \stdClass::class,
+            pagination: Pagination::PrevNext,
+            perPage: 25,
+            interactive: false,
+            emptyMessage: '',
+            renderRow: null,
+            columns: [
+                new ColumnDefinition(
+                    propertyName: 'accountNumber',
+                    label: 'Numéro',
+                    class: null,
+                    formatter: Formatter::Plain,
+                    template: null,
+                    sortable: 'a.code',
+                    hideOnMobile: false,
+                ),
+            ],
+            filters: [],
+            search: null,
+            rowSignatures: [],
+            defaultSort: new SortOrder(column: 'a.code', direction: 'asc'),
+        );
+
+        $page = $this->parser->parse($definition, Request::create('/', 'GET', ['sort' => 'accountNumber:desc']));
+
+        self::assertNotNull($page->sort);
+        self::assertSame('a.code', $page->sort->column);
+        self::assertSame('asc', $page->sort->direction);
+    }
+
+    public function testAcceptsSortBySortableKey(): void
+    {
+        $definition = new GridDefinition(
+            name: 'test_alias',
+            dataSource: InMemoryDataSource::class,
+            filterClass: \stdClass::class,
+            pagination: Pagination::PrevNext,
+            perPage: 25,
+            interactive: false,
+            emptyMessage: '',
+            renderRow: null,
+            columns: [
+                new ColumnDefinition(
+                    propertyName: 'accountNumber',
+                    label: 'Numéro',
+                    class: null,
+                    formatter: Formatter::Plain,
+                    template: null,
+                    sortable: 'a.code',
+                    hideOnMobile: false,
+                ),
+            ],
+            filters: [],
+            search: null,
+            rowSignatures: [],
+            defaultSort: new SortOrder(column: 'a.code', direction: 'asc'),
+        );
+
+        $page = $this->parser->parse($definition, Request::create('/', 'GET', ['sort' => 'a.code:desc']));
+
+        self::assertNotNull($page->sort);
+        self::assertSame('a.code', $page->sort->column);
+        self::assertSame('desc', $page->sort->direction);
+    }
+
     public function testUsesPerPageFromDefinition(): void
     {
         $page = $this->parser->parse($this->buildDefinition(), Request::create('/'));

@@ -236,10 +236,8 @@
             {% for filter in filters %}
                 {% set filterType = filter.type.value ?? filter.type %}
                 {% if filterType == 'date_range' %}
-                    {% set fromProp = filter.propertyName ~ 'From' %}
-                    {% set toProp = filter.propertyName ~ 'To' %}
-                    {% set fromValue = attribute(view.filter, fromProp) ?? attribute(view.filter, filter.propertyName ~ '_from') ?? '' %}
-                    {% set toValue = attribute(view.filter, toProp) ?? attribute(view.filter, filter.propertyName ~ '_to') ?? '' %}
+                    {% set fromValue = attribute(view.filter, filter.propertyName ~ 'From') ?? attribute(view.filter, filter.propertyName ~ '_from') ?? '' %}
+                    {% set toValue = attribute(view.filter, filter.propertyName ~ 'To') ?? attribute(view.filter, filter.propertyName ~ '_to') ?? '' %}
                     <div class="fb-daterange">
                         <span class="fb-daterange-label">{{ filter.label }}</span>
                         <label class="sr-only"
@@ -248,7 +246,7 @@
                         </label>
                         <input type="date"
                                id="fb-live-dr-{{ view.definition.name }}-{{ filter.propertyName }}-from"
-                               data-model="{{ fromProp }}"
+                               data-model="criteria[{{ filter.propertyName }}_from]"
                                value="{{ fromValue is not null and fromValue != '' ? fromValue|safe_date_fr('Y-m-d') : '' }}">
                         <span class="fb-daterange-sep" aria-hidden="true">→</span>
                         <label class="sr-only"
@@ -257,7 +255,7 @@
                         </label>
                         <input type="date"
                                id="fb-live-dr-{{ view.definition.name }}-{{ filter.propertyName }}-to"
-                               data-model="{{ toProp }}"
+                               data-model="criteria[{{ filter.propertyName }}_to]"
                                value="{{ toValue is not null and toValue != '' ? toValue|safe_date_fr('Y-m-d') : '' }}">
                     </div>
                 {% endif %}

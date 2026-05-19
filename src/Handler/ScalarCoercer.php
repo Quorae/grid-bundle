@@ -47,8 +47,13 @@ final readonly class ScalarCoercer
         if (\is_int($value)) {
             return $value;
         }
-        if (\is_string($value) && $value !== '' && filter_var($value, \FILTER_VALIDATE_INT) !== false) {
-            return (int) $value;
+        if (\is_string($value) && $value !== '') {
+            if (filter_var($value, \FILTER_VALIDATE_INT) !== false) {
+                return (int) $value;
+            }
+            if (is_numeric($value) && (int) $value == (float) $value) {
+                return (int) $value;
+            }
         }
 
         return null;
@@ -72,6 +77,9 @@ final readonly class ScalarCoercer
             return $value;
         }
         if (\is_string($value)) {
+            if ($value === '') {
+                return null;
+            }
             $result = filter_var($value, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE);
 
             return \is_bool($result) ? $result : null;

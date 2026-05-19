@@ -80,7 +80,7 @@ final readonly class PageParser
             if ($column->sortable === false) {
                 continue;
             }
-            if ($column->sortable === $columnCandidate || $column->propertyName === $columnCandidate) {
+            if ($column->sortable === $columnCandidate) {
                 return $column->sortable;
             }
         }

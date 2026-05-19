@@ -190,6 +190,26 @@ final class ScalarCoercerTest extends TestCase
         self::assertNull($this->coercer->coerceFloat(['x']));
     }
 
+    public function testCoerceIntFromLeadingZeroString(): void
+    {
+        self::assertSame(7, $this->coercer->coerceInt('07'));
+    }
+
+    public function testCoerceIntFromDecimalNotationString(): void
+    {
+        self::assertSame(7, $this->coercer->coerceInt('7.0'));
+    }
+
+    public function testCoerceIntReturnsNullForActualFloat(): void
+    {
+        self::assertNull($this->coercer->coerceInt('7.5'));
+    }
+
+    public function testCoerceBoolReturnsNullForEmptyString(): void
+    {
+        self::assertNull($this->coercer->coerceBool(''));
+    }
+
     // --- coerceEnum ---
 
     public function testCoerceEnumFromValidStringValue(): void
