@@ -197,4 +197,31 @@ final class InvalidGridDefinitionException extends \LogicException implements Gr
             $validatorFqcn,
         ));
     }
+
+    public static function bulkActionHandlerAndRouteMutuallyExclusive(string $gridClass, string $actionName): self
+    {
+        return new self(\sprintf(
+            'Grid "%s" bulk action "%s" declares both handler and route — these are mutually exclusive.',
+            $gridClass,
+            $actionName,
+        ));
+    }
+
+    public static function bulkActionMissingHandlerOrRoute(string $gridClass, string $actionName): self
+    {
+        return new self(\sprintf(
+            'Grid "%s" bulk action "%s" must declare either a handler or a route.',
+            $gridClass,
+            $actionName,
+        ));
+    }
+
+    public static function bulkActionHandlerRequiresValidator(string $gridClass, string $actionName): self
+    {
+        return new self(\sprintf(
+            'Grid "%s" bulk action "%s" declares a handler but no ownershipValidator — handler-based actions require an ownership validator.',
+            $gridClass,
+            $actionName,
+        ));
+    }
 }

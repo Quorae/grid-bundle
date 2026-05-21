@@ -262,7 +262,8 @@ final class LiveGrid
             BulkActionErrorKind::AccessDenied,
             BulkActionErrorKind::UnknownAction => 'error',
             BulkActionErrorKind::HandlerNotTagged,
-            BulkActionErrorKind::ValidatorNotTagged => throw $exception,
+            BulkActionErrorKind::ValidatorNotTagged,
+            BulkActionErrorKind::RouteBasedAction => throw $exception,
         };
     }
 

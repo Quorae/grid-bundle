@@ -58,21 +58,34 @@
 
     <div class="grid-bulk-bar__actions">
         {% for action in view.definition.bulkActions %}
-            {% set confirmMsg = action.confirmMessage|default(null) %}
-            {% if confirmMsg is not null %}
-                {% set confirmMsg = confirmMsg|replace({'{count}': selectedCount}) %}
-            {% endif %}
-            <button type="button"
-                    class="btn {{ action.destructive ? 'danger' : 'primary' }} sm"
-                    data-action="live#action:prevent"
-                    data-live-action-param="executeBulk"
-                    data-live-action-name-param="{{ action.name }}"
-                    {% if confirmMsg %}data-confirm-message="{{ confirmMsg|e('html_attr') }}"{% endif %}>
-                {% if action.icon %}
-                    <twig:ux:icon name="{{ action.icon }}" class="grid-bulk-bar__icon w-4 h-4" aria-hidden="true" />
+            {% if action.route %}
+                {# Route-based — navigates to the route with selectedIds as query params.
+                   The consuming page controls Turbo Frame context. #}
+                <a href="{{ path(action.route, {selectedIds: selectedIds}) }}"
+                   class="btn {{ action.destructive ? 'danger' : 'primary' }} sm">
+                    {% if action.icon %}
+                        <twig:ux:icon name="{{ action.icon }}" class="grid-bulk-bar__icon w-4 h-4" aria-hidden="true" />
+                    {% endif %}
+                    <span>{{ action.label }}</span>
+                </a>
+            {% else %}
+                {# Handler-based — invokes the LiveAction executeBulk. #}
+                {% set confirmMsg = action.confirmMessage|default(null) %}
+                {% if confirmMsg is not null %}
+                    {% set confirmMsg = confirmMsg|replace({'{count}': selectedCount}) %}
                 {% endif %}
-                <span>{{ action.label }}</span>
-            </button>
+                <button type="button"
+                        class="btn {{ action.destructive ? 'danger' : 'primary' }} sm"
+                        data-action="live#action:prevent"
+                        data-live-action-param="executeBulk"
+                        data-live-action-name-param="{{ action.name }}"
+                        {% if confirmMsg %}data-confirm-message="{{ confirmMsg|e('html_attr') }}"{% endif %}>
+                    {% if action.icon %}
+                        <twig:ux:icon name="{{ action.icon }}" class="grid-bulk-bar__icon w-4 h-4" aria-hidden="true" />
+                    {% endif %}
+                    <span>{{ action.label }}</span>
+                </button>
+            {% endif %}
         {% endfor %}
     </div>
 </div>

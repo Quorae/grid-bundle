@@ -13,4 +13,5 @@ enum BulkActionErrorKind: string
     case ValidatorNotTagged = 'validator_not_tagged';
     case OwnershipRejected = 'ownership_rejected';
     case AccessDenied = 'access_denied';
+    case RouteBasedAction = 'route_based_action';
 }

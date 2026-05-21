@@ -18,18 +18,20 @@ use Quorae\GridBundle\Contract\BulkOwnershipValidator;
 final readonly class BulkActionDefinition
 {
     /**
-     * @param class-string<BulkActionHandler>      $handlerService
-     * @param class-string<BulkOwnershipValidator> $ownershipValidator
+     * @param ?class-string<BulkActionHandler>      $handlerService     null for route-based actions
+     * @param ?class-string<BulkOwnershipValidator> $ownershipValidator null for route-based actions
+     * @param ?string                               $route              Symfony route name for navigation-based actions (mutually exclusive with $handlerService)
      */
     public function __construct(
         public string $name,
         public string $label,
-        public string $handlerService,
-        public string $ownershipValidator,
+        public ?string $handlerService,
+        public ?string $ownershipValidator,
         public bool $destructive,
         public ?string $icon,
         public ?string $confirmMessage,
         public string $requiredRole,
+        public ?string $route = null,
     ) {
     }
 }

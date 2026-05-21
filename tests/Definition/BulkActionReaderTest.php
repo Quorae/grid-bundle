@@ -14,8 +14,12 @@ use Quorae\GridBundle\Tests\Fixtures\BulkGridHandlerMissingInterface;
 use Quorae\GridBundle\Tests\Fixtures\BulkGridHappyPath;
 use Quorae\GridBundle\Tests\Fixtures\BulkGridInteractiveFalse;
 use Quorae\GridBundle\Tests\Fixtures\BulkGridMissingRowId;
+use Quorae\GridBundle\Tests\Fixtures\BulkGridMixedHandlerAndRoute;
 use Quorae\GridBundle\Tests\Fixtures\BulkGridValidatorMissingInterface;
+use Quorae\GridBundle\Tests\Fixtures\BulkGridWithHandlerAndRoute;
+use Quorae\GridBundle\Tests\Fixtures\BulkGridWithRoute;
 use Quorae\GridBundle\Tests\Fixtures\BulkGridWithRowIdAttribute;
+use Quorae\GridBundle\Tests\Fixtures\BulkGridWithoutHandlerOrRoute;
 use Quorae\GridBundle\Tests\Fixtures\StubOwnershipValidator;
 use PHPUnit\Framework\TestCase;
 
@@ -156,6 +160,73 @@ final class BulkActionReaderTest extends TestCase
         $this->expectExceptionMessage('more than one #[RowId]');
 
         $this->reader->resolveRowIdProperty($asGrid, $bulkActions, BulkGridDuplicateRowId::class);
+    }
+
+    public function testReadsRouteBulkAction(): void
+    {
+        $ref = new \ReflectionClass(BulkGridWithRoute::class);
+        $asGrid = $this->readAsGrid($ref);
+
+        $actions = $this->reader->readBulkActions($ref, $asGrid);
+
+        self::assertCount(1, $actions);
+        self::assertSame('batch_remediation', $actions[0]->name);
+        self::assertSame('Remédier la sélection', $actions[0]->label);
+        self::assertSame('app_batch_remediation_selector', $actions[0]->route);
+        self::assertNull($actions[0]->handlerService);
+        self::assertNull($actions[0]->ownershipValidator);
+        self::assertSame('heroicons:wrench-16-solid', $actions[0]->icon);
+    }
+
+    public function testRejectsHandlerAndRouteTogether(): void
+    {
+        $ref = new \ReflectionClass(BulkGridWithHandlerAndRoute::class);
+        $asGrid = $this->readAsGrid($ref);
+
+        $this->expectException(InvalidGridDefinitionException::class);
+        $this->expectExceptionMessage('mutually exclusive');
+
+        $this->reader->readBulkActions($ref, $asGrid);
+    }
+
+    public function testRejectsNeitherHandlerNorRoute(): void
+    {
+        $ref = new \ReflectionClass(BulkGridWithoutHandlerOrRoute::class);
+        $asGrid = $this->readAsGrid($ref);
+
+        $this->expectException(InvalidGridDefinitionException::class);
+        $this->expectExceptionMessage('must declare either');
+
+        $this->reader->readBulkActions($ref, $asGrid);
+    }
+
+    public function testMixedHandlerAndRouteActionsCoexist(): void
+    {
+        $ref = new \ReflectionClass(BulkGridMixedHandlerAndRoute::class);
+        $asGrid = $this->readAsGrid($ref);
+
+        $actions = $this->reader->readBulkActions($ref, $asGrid);
+
+        self::assertCount(2, $actions);
+
+        self::assertSame('delete', $actions[0]->name);
+        self::assertNotNull($actions[0]->handlerService);
+        self::assertNull($actions[0]->route);
+
+        self::assertSame('batch_remediation', $actions[1]->name);
+        self::assertNull($actions[1]->handlerService);
+        self::assertSame('app_batch_remediation', $actions[1]->route);
+    }
+
+    public function testRouteActionResolvesRowIdProperty(): void
+    {
+        $ref = new \ReflectionClass(BulkGridWithRoute::class);
+        $asGrid = $this->readAsGrid($ref);
+        $bulkActions = $this->reader->readBulkActions($ref, $asGrid);
+
+        $rowIdProperty = $this->reader->resolveRowIdProperty($asGrid, $bulkActions, BulkGridWithRoute::class);
+
+        self::assertSame('id', $rowIdProperty);
     }
 
     /**

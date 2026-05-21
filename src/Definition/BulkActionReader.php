@@ -51,8 +51,13 @@ final class BulkActionReader
             }
             $seenNames[$bulkAction->name] = true;
 
-            $this->assertHandlerImplementsInterface($gridClass, $bulkAction->handler);
-            $this->assertValidatorImplementsInterface($gridClass, $bulkAction->ownershipValidator);
+            $this->assertHandlerRouteExclusivity($gridClass, $bulkAction);
+
+            if ($bulkAction->handler !== null) {
+                $this->assertHandlerImplementsInterface($gridClass, $bulkAction->handler);
+                \assert($bulkAction->ownershipValidator !== null);
+                $this->assertValidatorImplementsInterface($gridClass, $bulkAction->ownershipValidator);
+            }
 
             $definitions[] = new BulkActionDefinition(
                 name: $bulkAction->name,
@@ -63,6 +68,7 @@ final class BulkActionReader
                 icon: $bulkAction->icon,
                 confirmMessage: $bulkAction->confirmMessage,
                 requiredRole: $bulkAction->requiredRole,
+                route: $bulkAction->route,
             );
         }
 
@@ -96,6 +102,27 @@ final class BulkActionReader
         }
 
         throw InvalidGridDefinitionException::bulkActionRequiresRowId($gridClass, $rowClass);
+    }
+
+    /**
+     * @param class-string $gridClass
+     */
+    private function assertHandlerRouteExclusivity(string $gridClass, BulkAction $bulkAction): void
+    {
+        $hasHandler = $bulkAction->handler !== null;
+        $hasRoute = $bulkAction->route !== null;
+
+        if ($hasHandler && $hasRoute) {
+            throw InvalidGridDefinitionException::bulkActionHandlerAndRouteMutuallyExclusive($gridClass, $bulkAction->name);
+        }
+
+        if (!$hasHandler && !$hasRoute) {
+            throw InvalidGridDefinitionException::bulkActionMissingHandlerOrRoute($gridClass, $bulkAction->name);
+        }
+
+        if ($hasHandler && $bulkAction->ownershipValidator === null) {
+            throw InvalidGridDefinitionException::bulkActionHandlerRequiresValidator($gridClass, $bulkAction->name);
+        }
     }
 
     /**

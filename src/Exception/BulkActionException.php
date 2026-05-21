@@ -69,4 +69,12 @@ final class BulkActionException extends \RuntimeException implements GridExcepti
             $submittedCount,
         ));
     }
+
+    public static function routeBasedAction(string $actionName): self
+    {
+        return new self(BulkActionErrorKind::RouteBasedAction, \sprintf(
+            'Bulk action "%s" is route-based and cannot be executed through the handler pipeline.',
+            $actionName,
+        ));
+    }
 }

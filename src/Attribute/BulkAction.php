@@ -31,17 +31,19 @@ use Quorae\GridBundle\Contract\BulkOwnershipValidator;
 final readonly class BulkAction
 {
     /**
-     * @param class-string<BulkActionHandler>      $handler            FQCN of a service that implements BulkActionHandler
-     * @param class-string<BulkOwnershipValidator> $ownershipValidator FQCN of a service that filters IDs by ownership — invoked before the handler
-     * @param ?string                              $icon               Heroicons identifier (e.g. `heroicons:trash-16-solid`) rendered in the action button
-     * @param ?string                              $confirmMessage     optional client-side prompt ; the placeholder `{count}` is substituted with the current selection size
-     * @param string                               $requiredRole       Symfony role the current user must hold — enforced server-side before invoking the handler
+     * @param ?class-string<BulkActionHandler>      $handler            FQCN of a service that implements BulkActionHandler — mutually exclusive with $route
+     * @param ?class-string<BulkOwnershipValidator> $ownershipValidator FQCN of a service that filters IDs by ownership — required when $handler is set
+     * @param ?string                               $route              Symfony route name — when set, the bulk button navigates to this route with selectedIds as query params instead of invoking a handler
+     * @param ?string                               $icon               Heroicons identifier (e.g. `heroicons:trash-16-solid`) rendered in the action button
+     * @param ?string                               $confirmMessage     optional client-side prompt ; the placeholder `{count}` is substituted with the current selection size
+     * @param string                                $requiredRole       Symfony role the current user must hold — enforced server-side before invoking the handler
      */
     public function __construct(
         public string $name,
         public string $label,
-        public string $handler,
-        public string $ownershipValidator,
+        public ?string $handler = null,
+        public ?string $ownershipValidator = null,
+        public ?string $route = null,
         public bool $destructive = false,
         public ?string $icon = null,
         public ?string $confirmMessage = null,

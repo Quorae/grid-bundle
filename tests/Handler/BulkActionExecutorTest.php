@@ -153,6 +153,30 @@ final class BulkActionExecutorTest extends TestCase
         }
     }
 
+    public function testThrowsWhenExecutingRouteBasedAction(): void
+    {
+        $routeAction = new BulkActionDefinition(
+            name: 'navigate',
+            label: 'Navigate',
+            handlerService: null,
+            ownershipValidator: null,
+            destructive: false,
+            icon: null,
+            confirmMessage: null,
+            requiredRole: 'ROLE_USER',
+            route: 'app_some_route',
+        );
+
+        $executor = $this->buildExecutor(
+            gridName: 'memos',
+            bulkActions: [$routeAction],
+        );
+
+        $this->expectException(BulkActionException::class);
+
+        $executor->execute('memos', 'navigate', [1], [], $this->buildUser());
+    }
+
     /**
      * @param class-string<BulkActionHandler>      $handler
      * @param class-string<BulkOwnershipValidator> $validator

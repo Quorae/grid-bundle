@@ -91,6 +91,10 @@ final readonly class BulkActionExecutor
         $definition = $this->grids->get($gridName);
         foreach ($definition->bulkActions as $bulk) {
             if ($bulk->name === $actionName) {
+                if ($bulk->route !== null) {
+                    throw BulkActionException::routeBasedAction($actionName);
+                }
+
                 if (!$this->security->isGranted($bulk->requiredRole)) {
                     throw BulkActionException::accessDenied($actionName, $bulk->requiredRole);
                 }
